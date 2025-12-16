@@ -126,6 +126,8 @@ curl http://localhost:51821/api/wireguard/client
 
 Create a new client.
 
+#### Basic Request (uses server defaults for AmneziaWG):
+
 ```bash
 curl -X POST http://localhost:51821/api/wireguard/client \
   -H "Content-Type: application/json" \
@@ -143,12 +145,57 @@ curl -X POST http://localhost:51821/api/wireguard/client \
 }
 ```
 
+#### Advanced Request (with custom AmneziaWG parameters):
+
+```bash
+curl -X POST http://localhost:51821/api/wireguard/client \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "client1",
+    "expiredDate": "2025-12-31",
+    "jc": "7",
+    "jmin": "50",
+    "jmax": "1000",
+    "s1": "100",
+    "s2": "100",
+    "h1": "1234567891",
+    "h2": "1234567892",
+    "h3": "1234567893",
+    "h4": "1234567894"
+  }'
+```
+
+**Request (Full):**
+```json
+{
+  "name": "client1",           // Required
+  "expiredDate": "2025-12-31", // Optional (YYYY-MM-DD)
+  
+  // Optional AmneziaWG parameters (omit to use server defaults)
+  "jc": "7",           // Junk packet count
+  "jmin": "50",        // Junk min size
+  "jmax": "1000",      // Junk max size
+  "s1": "100",         // Init packet junk size
+  "s2": "100",         // Response packet junk size
+  "h1": "1234567891",  // Init packet magic header
+  "h2": "1234567892",  // Response packet magic header
+  "h3": "1234567893",  // Underload packet magic header
+  "h4": "1234567894"   // Transport packet magic header
+}
+```
+
 **Response:**
 ```json
 {
   "success": true
 }
 ```
+
+**Notes:**
+- All AmneziaWG parameters are optional
+- If not specified, client will use server's default obfuscation settings
+- If specified, client will use custom parameters (useful for per-client obfuscation)
+- See [AmneziaWG Parameters Guide](./AMNEZIAWG_PARAMETERS.md) for parameter details
 
 ### DELETE `/api/wireguard/client/:clientId`
 

@@ -39,6 +39,17 @@ type Client struct {
 	AllowedIPs           string     `json:"allowedIPs,omitempty"`
 	OneTimeLink          *string    `json:"oneTimeLink,omitempty"`
 	OneTimeLinkExpiresAt *time.Time `json:"oneTimeLinkExpiresAt,omitempty"`
+
+	// AmneziaWG obfuscation parameters (optional, uses server defaults if not set)
+	Jc   *string `json:"jc,omitempty"`
+	Jmin *string `json:"jmin,omitempty"`
+	Jmax *string `json:"jmax,omitempty"`
+	S1   *string `json:"s1,omitempty"`
+	S2   *string `json:"s2,omitempty"`
+	H1   *string `json:"h1,omitempty"`
+	H2   *string `json:"h2,omitempty"`
+	H3   *string `json:"h3,omitempty"`
+	H4   *string `json:"h4,omitempty"`
 }
 
 // ClientResponse is the API response for client queries (includes runtime stats)
@@ -96,6 +107,34 @@ type WGDumpEntry struct {
 type CreateClientRequest struct {
 	Name        string `json:"name" binding:"required"`
 	ExpiredDate string `json:"expiredDate,omitempty"`
+
+	// AmneziaWG obfuscation parameters (optional)
+	Jc   *string `json:"jc,omitempty"`
+	Jmin *string `json:"jmin,omitempty"`
+	Jmax *string `json:"jmax,omitempty"`
+	S1   *string `json:"s1,omitempty"`
+	S2   *string `json:"s2,omitempty"`
+	H1   *string `json:"h1,omitempty"`
+	H2   *string `json:"h2,omitempty"`
+	H3   *string `json:"h3,omitempty"`
+	H4   *string `json:"h4,omitempty"`
+}
+
+// CreateClientParams holds parameters for creating a new client
+type CreateClientParams struct {
+	Name        string
+	ExpiredDate *time.Time
+
+	// AmneziaWG obfuscation parameters (optional, nil = use server defaults)
+	Jc   *string
+	Jmin *string
+	Jmax *string
+	S1   *string
+	S2   *string
+	H1   *string
+	H2   *string
+	H3   *string
+	H4   *string
 }
 
 // UpdateClientNameRequest is the request body for updating client name

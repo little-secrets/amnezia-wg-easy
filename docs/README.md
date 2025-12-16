@@ -11,6 +11,7 @@ Complete documentation for AmneziaWG Easy (Go Edition).
 ### Configuration
 - **[Environment Variables](./ENVIRONMENT_VARIABLES.md)** - Complete ENV reference
 - **[AmneziaWG Parameters](./AMNEZIAWG_PARAMETERS.md)** - Traffic obfuscation settings
+- **[Per-Client Parameters](./PER_CLIENT_PARAMETERS.md)** - Custom parameters for individual clients
 
 ### Development
 - **[Architecture](./ARCHITECTURE.md)** - Project structure and components
@@ -38,10 +39,16 @@ PASSWORD_HASH='$2a$12$...'
 
 **Understand obfuscation:**
 ```bash
-JC=7  # Junk packet count
+JC=7  # Junk packet count (server-wide)
 H1=1234567891  # Magic header
 ```
 → [AmneziaWG Parameters](./AMNEZIAWG_PARAMETERS.md)
+
+**Per-client custom parameters:**
+```bash
+curl -X POST /api/wireguard/client -d '{"name":"client","jc":"10"}'
+```
+→ [Per-Client Parameters](./PER_CLIENT_PARAMETERS.md)
 
 **Use the API:**
 ```bash

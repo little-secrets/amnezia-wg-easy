@@ -158,7 +158,22 @@ func (h *Handler) CreateClient(c *gin.Context) {
 		expiredDate = &t
 	}
 
-	_, err := h.wg.CreateClient(req.Name, expiredDate)
+	// Build create params with optional AmneziaWG parameters
+	params := &models.CreateClientParams{
+		Name:        req.Name,
+		ExpiredDate: expiredDate,
+		Jc:          req.Jc,
+		Jmin:        req.Jmin,
+		Jmax:        req.Jmax,
+		S1:          req.S1,
+		S2:          req.S2,
+		H1:          req.H1,
+		H2:          req.H2,
+		H3:          req.H3,
+		H4:          req.H4,
+	}
+
+	_, err := h.wg.CreateClient(params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
 		return

@@ -130,11 +130,11 @@ func (wg *WireGuard) GetClient(clientID string) (*models.Client, error) {
 }
 
 // CreateClient creates a new WireGuard client
-func (wg *WireGuard) CreateClient(name string, expiredDate *time.Time) (*models.Client, error) {
+func (wg *WireGuard) CreateClient(params *models.CreateClientParams) (*models.Client, error) {
 	wg.mu.Lock()
 	defer wg.mu.Unlock()
 
-	if name == "" {
+	if params.Name == "" {
 		return nil, fmt.Errorf("name is required")
 	}
 
@@ -164,7 +164,7 @@ func (wg *WireGuard) CreateClient(name string, expiredDate *time.Time) (*models.
 	now := time.Now()
 	client := &models.Client{
 		ID:           uuid.New().String(),
-		Name:         name,
+		Name:         params.Name,
 		Address:      address,
 		PrivateKey:   strings.TrimSpace(privateKey),
 		PublicKey:    strings.TrimSpace(publicKey),
@@ -172,11 +172,22 @@ func (wg *WireGuard) CreateClient(name string, expiredDate *time.Time) (*models.
 		Enabled:      true,
 		CreatedAt:    now,
 		UpdatedAt:    now,
+
+		// Set custom AmneziaWG parameters if provided (nil = use server defaults)
+		Jc:   params.Jc,
+		Jmin: params.Jmin,
+		Jmax: params.Jmax,
+		S1:   params.S1,
+		S2:   params.S2,
+		H1:   params.H1,
+		H2:   params.H2,
+		H3:   params.H3,
+		H4:   params.H4,
 	}
 
-	if expiredDate != nil {
+	if params.ExpiredDate != nil {
 		// Set expiry to end of day
-		exp := time.Date(expiredDate.Year(), expiredDate.Month(), expiredDate.Day(), 23, 59, 59, 0, expiredDate.Location())
+		exp := time.Date(params.ExpiredDate.Year(), params.ExpiredDate.Month(), params.ExpiredDate.Day(), 23, 59, 59, 0, params.ExpiredDate.Location())
 		client.ExpiredAt = &exp
 	}
 
@@ -359,6 +370,17 @@ func (wg *WireGuard) GetClientConfiguration(clientID string) (string, error) {
 		privateKey = "REPLACE_ME"
 	}
 
+	// Use client-specific parameters if set, otherwise use server defaults
+	jc := wg.getParamOrDefault(client.Jc, wg.config.Server.Jc)
+	jmin := wg.getParamOrDefault(client.Jmin, wg.config.Server.Jmin)
+	jmax := wg.getParamOrDefault(client.Jmax, wg.config.Server.Jmax)
+	s1 := wg.getParamOrDefault(client.S1, wg.config.Server.S1)
+	s2 := wg.getParamOrDefault(client.S2, wg.config.Server.S2)
+	h1 := wg.getParamOrDefault(client.H1, wg.config.Server.H1)
+	h2 := wg.getParamOrDefault(client.H2, wg.config.Server.H2)
+	h3 := wg.getParamOrDefault(client.H3, wg.config.Server.H3)
+	h4 := wg.getParamOrDefault(client.H4, wg.config.Server.H4)
+
 	var sb strings.Builder
 	sb.WriteString("[Interface]\n")
 	sb.WriteString(fmt.Sprintf("PrivateKey = %s\n", privateKey))
@@ -369,15 +391,15 @@ func (wg *WireGuard) GetClientConfiguration(clientID string) (string, error) {
 	if wg.cfg.WGMTU != "" {
 		sb.WriteString(fmt.Sprintf("MTU = %s\n", wg.cfg.WGMTU))
 	}
-	sb.WriteString(fmt.Sprintf("Jc = %s\n", wg.config.Server.Jc))
-	sb.WriteString(fmt.Sprintf("Jmin = %s\n", wg.config.Server.Jmin))
-	sb.WriteString(fmt.Sprintf("Jmax = %s\n", wg.config.Server.Jmax))
-	sb.WriteString(fmt.Sprintf("S1 = %s\n", wg.config.Server.S1))
-	sb.WriteString(fmt.Sprintf("S2 = %s\n", wg.config.Server.S2))
-	sb.WriteString(fmt.Sprintf("H1 = %s\n", wg.config.Server.H1))
-	sb.WriteString(fmt.Sprintf("H2 = %s\n", wg.config.Server.H2))
-	sb.WriteString(fmt.Sprintf("H3 = %s\n", wg.config.Server.H3))
-	sb.WriteString(fmt.Sprintf("H4 = %s\n", wg.config.Server.H4))
+	sb.WriteString(fmt.Sprintf("Jc = %s\n", jc))
+	sb.WriteString(fmt.Sprintf("Jmin = %s\n", jmin))
+	sb.WriteString(fmt.Sprintf("Jmax = %s\n", jmax))
+	sb.WriteString(fmt.Sprintf("S1 = %s\n", s1))
+	sb.WriteString(fmt.Sprintf("S2 = %s\n", s2))
+	sb.WriteString(fmt.Sprintf("H1 = %s\n", h1))
+	sb.WriteString(fmt.Sprintf("H2 = %s\n", h2))
+	sb.WriteString(fmt.Sprintf("H3 = %s\n", h3))
+	sb.WriteString(fmt.Sprintf("H4 = %s\n", h4))
 	sb.WriteString("\n[Peer]\n")
 	sb.WriteString(fmt.Sprintf("PublicKey = %s\n", wg.config.Server.PublicKey))
 	if client.PreSharedKey != "" {
@@ -388,6 +410,14 @@ func (wg *WireGuard) GetClientConfiguration(clientID string) (string, error) {
 	sb.WriteString(fmt.Sprintf("Endpoint = %s:%s", wg.cfg.WGHost, wg.cfg.WGConfigPort))
 
 	return sb.String(), nil
+}
+
+// getParamOrDefault returns client parameter if set, otherwise server default
+func (wg *WireGuard) getParamOrDefault(clientParam *string, serverDefault string) string {
+	if clientParam != nil && *clientParam != "" {
+		return *clientParam
+	}
+	return serverDefault
 }
 
 // GetClientQRCode returns QR code SVG for client configuration

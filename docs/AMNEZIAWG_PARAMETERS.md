@@ -6,6 +6,18 @@ AmneziaWG adds traffic obfuscation to WireGuard by injecting junk packets and mo
 
 When you don't set these parameters, they are **automatically randomized** for maximum security. You only need to set them manually if you want specific values.
 
+### Server-Wide vs Per-Client Parameters
+
+**NEW in v1.1:** You can now set AmneziaWG parameters in two ways:
+
+1. **Server-Wide (ENV)**: All clients inherit these parameters by default
+2. **Per-Client (API)**: Override server defaults for specific clients
+
+This allows you to:
+- Test different obfuscation settings per client
+- Provide custom parameters for specific use cases
+- Maintain diversity in obfuscation patterns
+
 ## 📊 Parameters Reference
 
 ### Junk Packet Parameters
@@ -208,7 +220,9 @@ Before handshake:
 
 ## 📝 Configuration Examples
 
-### Maximum Stealth
+### Server-Wide Configuration (Environment Variables)
+
+#### Maximum Stealth
 
 ```bash
 # High junk count, variable sizes
@@ -249,6 +263,55 @@ S1=75
 S2=75
 # Leave H1-H4 empty for random
 ```
+
+### Per-Client Configuration (API)
+
+**NEW:** Override server defaults for individual clients:
+
+#### Client with Maximum Obfuscation
+
+```bash
+curl -X POST http://localhost:51821/api/wireguard/client \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "stealth-client",
+    "jc": "10",
+    "jmin": "100",
+    "jmax": "1400",
+    "s1": "150",
+    "s2": "150",
+    "h1": "2147483647",
+    "h2": "2147483646",
+    "h3": "2147483645",
+    "h4": "2147483644"
+  }'
+```
+
+#### Client with Custom Headers Only
+
+```bash
+curl -X POST http://localhost:51821/api/wireguard/client \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "custom-header-client",
+    "h1": "9999999",
+    "h2": "8888888",
+    "h3": "7777777",
+    "h4": "6666666"
+  }'
+```
+*Other parameters (JC, JMIN, etc.) will use server defaults*
+
+#### Client using Server Defaults
+
+```bash
+curl -X POST http://localhost:51821/api/wireguard/client \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "standard-client"
+  }'
+```
+*All parameters inherited from server configuration*
 
 ## 🧪 Testing Your Configuration
 

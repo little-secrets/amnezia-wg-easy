@@ -90,9 +90,11 @@ Open `http://your.server.ip:51821` and login with your password.
 
 - **[Environment Variables](./docs/ENVIRONMENT_VARIABLES.md)** - Complete list of all ENV options
 - **[AmneziaWG Parameters](./docs/AMNEZIAWG_PARAMETERS.md)** - Deep dive into obfuscation settings
+- **[Per-Client Parameters](./docs/PER_CLIENT_PARAMETERS.md)** - Custom obfuscation per client
 - **[Password Generation](./docs/PASSWORD_GENERATION.md)** - Using the `wgpw` utility
 - **[Architecture](./docs/ARCHITECTURE.md)** - Project structure and components
 - **[API Reference](./docs/API_REFERENCE.md)** - REST API endpoints
+- **[Examples](./examples/README.md)** - Practical usage examples
 
 ## 🔧 Important Environment Variables
 
@@ -137,8 +139,10 @@ curl http://localhost:51821/metrics
 
 ### Custom AmneziaWG Settings
 
+#### Server-Wide (Default for all clients):
+
 ```bash
-# Set specific obfuscation parameters
+# Set specific obfuscation parameters for server
 JC=7
 JMIN=50
 JMAX=1000
@@ -149,6 +153,32 @@ H2=1234567892
 H3=1234567893
 H4=1234567894
 ```
+
+#### Per-Client Custom Parameters:
+
+You can now set individual AmneziaWG parameters for each client via API:
+
+```bash
+curl -X POST http://localhost:51821/api/wireguard/client \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "special-client",
+    "jc": "10",
+    "s1": "150",
+    "s2": "150",
+    "h1": "9999999",
+    "h2": "8888888",
+    "h3": "7777777",
+    "h4": "6666666"
+  }'
+```
+
+**Benefits:**
+- Different obfuscation for different clients
+- Test various settings without affecting others
+- Enhanced security through diversity
+
+See [API Reference - Create Client](./docs/API_REFERENCE.md#post-apiwireguardclient) for details.
 
 ## 🏗️ Development
 
