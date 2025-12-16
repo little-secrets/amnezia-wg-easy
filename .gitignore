@@ -1,7 +1,46 @@
-/config
-/wg0.conf
-/wg0.json
-/src/node_modules
-.DS_Store
+# Binaries
+amnezia-wg-easy
+amnezia-wg-easy.exe
+wgpw
+wgpw.exe
+
+# Go
+*.test
+*.out
+vendor/
+go.work
+go.work.sum
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
 *.swp
-.idea
+*.swo
+*~
+
+# Node.js (legacy source)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# WireGuard config (for local testing)
+config/
+*.conf
+wg0.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Temporary
+*.tmp
+*.bak
+*.log

@@ -1,1 +1,38 @@
-/src/node_modules
+# Git
+.git
+.gitignore
+
+# Build artifacts
+*.exe
+amnezia-wg-easy
+wgpw
+
+# Go
+*.test
+*.out
+vendor/
+
+# Node.js (old source)
+node_modules/
+npm-debug.log
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docs
+*.md
+!How_to_generate_an_bcrypt_hash.md
+
+# Assets
+assets/
+docs/
+
+# Dev files
+docker-compose.dev.yml
