@@ -1,6 +1,6 @@
 services:
   amnezia-wg-easy:
-    image: ghcr.io/w0rng/amnezia-wg-easy:latest
+    image: go-amnezia-wg-easy:latest
     container_name: amnezia-wg-easy
     restart: unless-stopped
     

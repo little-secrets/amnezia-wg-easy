@@ -14,10 +14,10 @@ RUN go mod download
 COPY . .
 
 # Build the main application
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o amnezia-wg-easy .
+RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -ldflags="-s -w" -o amnezia-wg-easy .
 
 # Build the wgpw tool
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o wgpw ./cmd/wgpw
+RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -ldflags="-s -w" -o wgpw ./cmd/wgpw
 
 # Final image
 FROM amneziavpn/amnezia-wg:latest
