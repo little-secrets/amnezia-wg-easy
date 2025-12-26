@@ -14,6 +14,7 @@ The easiest way to install & manage AmneziaWG with a Web UI, rewritten in Go.
 - **API-only mode**: Disable Web UI with `NO_WEB_UI=true`
 - **Built-in password tool**: Generate bcrypt hashes with `wgpw`
 - **Full AmneziaWG support**: Traffic obfuscation out of the box
+- **OpenAPI documentation**: Interactive Swagger UI at `/api/docs`
 - **Prometheus metrics**: Monitor your VPN with `/metrics` endpoint
 - **Modern UI**: Automatic Dark/Light mode, multilingual support
 
@@ -94,7 +95,9 @@ Open `http://your.server.ip:51821` and login with your password.
 - **[Password Generation](./docs/PASSWORD_GENERATION.md)** - Using the `wgpw` utility
 - **[Architecture](./docs/ARCHITECTURE.md)** - Project structure and components
 - **[API Reference](./docs/API_REFERENCE.md)** - REST API endpoints
-- **[Examples](./examples/README.md)** - Practical usage examples
+- **[OpenAPI Documentation](./docs/openapi.yaml)** - Interactive API docs ([Swagger UI](http://localhost:51821/api/docs))
+- **[OpenAPI Guide](./docs/OPENAPI_GUIDE.md)** - How to use OpenAPI documentation
+- **[Examples](./docs/examples/README.md)** - API client examples (Python, JavaScript)
 
 ## 🔧 Important Environment Variables
 
@@ -240,6 +243,24 @@ docker compose -f docker-compose.yml up --build
 
 ## 📊 REST API
 
+### Interactive API Documentation
+
+Access the **Swagger UI** documentation at:
+
+```
+http://localhost:51821/api/docs
+```
+
+This provides:
+- 📖 Complete API reference with examples
+- 🧪 Interactive "Try it out" functionality
+- 📝 Request/response schemas
+- 🔐 Built-in authentication testing
+
+You can also view the raw OpenAPI specification:
+- **YAML**: http://localhost:51821/api/openapi.yaml
+- **Markdown**: [API_REFERENCE.md](./docs/API_REFERENCE.md)
+
 ### Authentication
 
 ```bash
@@ -253,7 +274,7 @@ curl -H "Authorization: your_password" \
   http://localhost:51821/api/wireguard/client
 ```
 
-### Client Management
+### Quick Examples
 
 ```bash
 # List clients

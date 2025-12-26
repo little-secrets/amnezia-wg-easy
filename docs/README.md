@@ -1,115 +1,213 @@
-# Documentation
+# 📚 Documentation Index
 
-Complete documentation for AmneziaWG Easy (Go Edition).
+Complete documentation for AmneziaWG Easy Go Edition.
 
-## 📚 Available Guides
+## 🚀 Quick Links
+
+- **[Main README](../README.md)** - Project overview and quick start
+- **[Swagger UI](http://localhost:51821/api/docs)** - Interactive API documentation 🆕
+
+## 📖 Core Documentation
 
 ### Getting Started
-- **[Main README](../README.md)** - Quick start and overview
+
+- **[Environment Variables](./ENVIRONMENT_VARIABLES.md)** - Configuration options
 - **[Password Generation](./PASSWORD_GENERATION.md)** - Using the `wgpw` utility
 
-### Configuration
-- **[Environment Variables](./ENVIRONMENT_VARIABLES.md)** - Complete ENV reference
-- **[AmneziaWG Parameters](./AMNEZIAWG_PARAMETERS.md)** - Traffic obfuscation settings
-- **[Per-Client Parameters](./PER_CLIENT_PARAMETERS.md)** - Custom parameters for individual clients
+### Features
 
-### Development
+- **[AmneziaWG Parameters](./AMNEZIAWG_PARAMETERS.md)** - Traffic obfuscation explained
+- **[Per-Client Parameters](./PER_CLIENT_PARAMETERS.md)** - Custom obfuscation per client
+
+### API Documentation 🆕
+
+- **[API Reference (Markdown)](./API_REFERENCE.md)** - Complete REST API reference
+- **[OpenAPI Specification (YAML)](./openapi.yaml)** - Machine-readable API spec 🆕
+- **[OpenAPI Guide](./OPENAPI_GUIDE.md)** - How to use OpenAPI documentation 🆕
+- **[Swagger UI](http://localhost:51821/api/docs)** - Interactive API testing 🆕
+
+### Code Examples 🆕
+
+- **[Python Client](./examples/openapi_client.py)** - Full Python API client 🆕
+- **[JavaScript Client](./examples/openapi_client.js)** - Node.js API client 🆕
+- **[Examples README](./examples/README.md)** - Usage guide and examples 🆕
+
+### Technical
+
 - **[Architecture](./ARCHITECTURE.md)** - Project structure and components
-- **[API Reference](./API_REFERENCE.md)** - REST API endpoints
+- **[Changelog (Go)](./CHANGELOG_GO.md)** - Changes from Node.js version
 
-### Other
-- **[Go Edition Changelog](./CHANGELOG_GO.md)** - What's new in the Go rewrite
+## 🎯 By Use Case
 
-## 🎯 Quick Links
+### I want to...
 
-### Most Common Tasks
+#### **Use the Web UI**
+→ See [Main README](../README.md#-quick-start)
 
-**Generate password hash:**
-```bash
-docker run --rm ghcr.io/w0rng/amnezia-wg-easy wgpw mypassword
+#### **Use the REST API**
+→ Start with [Swagger UI](http://localhost:51821/api/docs) 🆕
+→ Or read [API Reference](./API_REFERENCE.md)
+
+#### **Generate API clients**
+→ Read [OpenAPI Guide](./OPENAPI_GUIDE.md) 🆕
+→ Use [OpenAPI Spec](./openapi.yaml) 🆕
+
+#### **Write integration scripts**
+→ See [Python Example](./examples/openapi_client.py) 🆕
+→ Or [JavaScript Example](./examples/openapi_client.js) 🆕
+
+#### **Configure obfuscation**
+→ Read [AmneziaWG Parameters](./AMNEZIAWG_PARAMETERS.md)
+→ And [Per-Client Parameters](./PER_CLIENT_PARAMETERS.md)
+
+#### **Deploy to production**
+→ Read [Environment Variables](./ENVIRONMENT_VARIABLES.md)
+→ And [Architecture](./ARCHITECTURE.md)
+
+#### **Understand the codebase**
+→ Read [Architecture](./ARCHITECTURE.md)
+→ And [Changelog](./CHANGELOG_GO.md)
+
+## 📊 Documentation Features
+
+### Interactive API Testing 🆕
+
+Access the **Swagger UI** for interactive API exploration:
+
 ```
-→ [Password Generation Guide](./PASSWORD_GENERATION.md)
-
-**Set environment variables:**
-```bash
-WG_HOST=your.server.ip
-PASSWORD_HASH='$2a$12$...'
+http://localhost:51821/api/docs
 ```
-→ [Environment Variables Reference](./ENVIRONMENT_VARIABLES.md)
 
-**Understand obfuscation:**
-```bash
-JC=7  # Junk packet count (server-wide)
-H1=1234567891  # Magic header
+**Features:**
+- 📖 Browse all endpoints
+- 🧪 Test API calls in browser
+- 🔐 Authenticate directly
+- 📝 View schemas and examples
+- 📋 Generate code snippets
+
+### OpenAPI Specification 🆕
+
+Download or use the machine-readable spec:
+
 ```
-→ [AmneziaWG Parameters](./AMNEZIAWG_PARAMETERS.md)
-
-**Per-client custom parameters:**
-```bash
-curl -X POST /api/wireguard/client -d '{"name":"client","jc":"10"}'
+http://localhost:51821/api/openapi.yaml
 ```
-→ [Per-Client Parameters](./PER_CLIENT_PARAMETERS.md)
 
-**Use the API:**
+**Use cases:**
+- Import into Postman/Insomnia
+- Generate typed clients (Python, TypeScript, Go, etc.)
+- Automated API testing
+- Documentation generation
+
+### Code Examples 🆕
+
+Ready-to-use API clients:
+
+**Python:**
 ```bash
-curl http://localhost:51821/api/wireguard/client
+pip install requests
+python docs/examples/openapi_client.py
 ```
-→ [API Reference](./API_REFERENCE.md)
 
-## 📖 Reading Order
+**JavaScript:**
+```bash
+npm install axios
+node docs/examples/openapi_client.js
+```
 
-### For First-Time Users:
-1. [Main README](../README.md) - Start here
-2. [Password Generation](./PASSWORD_GENERATION.md) - Set up authentication
-3. [Environment Variables](./ENVIRONMENT_VARIABLES.md) - Configure your setup
+## 🗂️ File Structure
 
-### For Developers:
-1. [Architecture](./ARCHITECTURE.md) - Understand the codebase
-2. [API Reference](./API_REFERENCE.md) - Integrate with the API
-3. [Environment Variables](./ENVIRONMENT_VARIABLES.md) - Available options
+```
+docs/
+├── README.md                    # This file
+├── ARCHITECTURE.md              # Project structure
+├── AMNEZIAWG_PARAMETERS.md      # Obfuscation guide
+├── API_REFERENCE.md             # REST API reference
+├── CHANGELOG_GO.md              # Go version changes
+├── ENVIRONMENT_VARIABLES.md     # Configuration
+├── PASSWORD_GENERATION.md       # Password utility
+├── PER_CLIENT_PARAMETERS.md     # Per-client settings
+├── openapi.yaml                 # 🆕 OpenAPI 3.0 spec
+├── OPENAPI_GUIDE.md             # 🆕 OpenAPI usage guide
+└── examples/                    # 🆕 Code examples
+    ├── README.md                # Examples guide
+    ├── openapi_client.py        # Python client
+    └── openapi_client.js        # JavaScript client
+```
 
-### For Advanced Users:
-1. [AmneziaWG Parameters](./AMNEZIAWG_PARAMETERS.md) - Fine-tune obfuscation
-2. [API Reference](./API_REFERENCE.md) - Automate operations
-3. [Architecture](./ARCHITECTURE.md) - Extend functionality
+## 📈 What's New in This Release
 
-## 🔍 Search by Topic
+### OpenAPI Documentation 🆕
 
-### Authentication
-- [Password Generation](./PASSWORD_GENERATION.md)
-- [Environment Variables - Authentication](./ENVIRONMENT_VARIABLES.md#authentication)
-- [API Reference - Authentication](./API_REFERENCE.md#authentication)
+Complete OpenAPI 3.0 specification with:
+- All endpoints documented
+- Request/response schemas
+- Authentication methods
+- Interactive Swagger UI
+- Code generation support
 
-### AmneziaWG Obfuscation
-- [AmneziaWG Parameters](./AMNEZIAWG_PARAMETERS.md)
-- [Environment Variables - AmneziaWG](./ENVIRONMENT_VARIABLES.md#amneziawg-obfuscation)
+### API Client Examples 🆕
 
-### API Integration
-- [API Reference](./API_REFERENCE.md)
-- [Architecture - API Layer](./ARCHITECTURE.md#5-api-layer)
+Production-ready client implementations:
+- **Python** - Full-featured async client
+- **JavaScript** - Promise-based Node.js client
+- Examples for all common operations
+- Error handling and best practices
 
-### Configuration
-- [Environment Variables](./ENVIRONMENT_VARIABLES.md)
-- [Architecture - Configuration Layer](./ARCHITECTURE.md#2-configuration-layer)
+### Enhanced Guides 🆕
 
-### Metrics
-- [API Reference - Metrics](./API_REFERENCE.md#prometheus-metrics)
-- [Environment Variables - Feature Flags](./ENVIRONMENT_VARIABLES.md#feature-flags)
+- [OpenAPI Guide](./OPENAPI_GUIDE.md) - Complete guide to using the OpenAPI spec
+- [Examples README](./examples/README.md) - How to use and customize clients
 
-## 💡 Tips
+## 🔗 External Resources
 
-- Most environment variables have sensible defaults
-- Only `WG_HOST` is required
-- AmneziaWG parameters auto-randomize for security
-- Check [CHANGELOG_GO.md](./CHANGELOG_GO.md) for what's new in Go edition
+### OpenAPI Ecosystem
 
-## 🐛 Found an Issue?
+- [OpenAPI Specification](https://swagger.io/specification/)
+- [Swagger Editor](https://editor.swagger.io/)
+- [OpenAPI Generator](https://openapi-generator.tech/)
 
-- Check the specific guide for troubleshooting sections
-- See [Environment Variables](./ENVIRONMENT_VARIABLES.md#troubleshooting)
-- Open an issue on GitHub
+### API Testing Tools
+
+- [Postman](https://www.postman.com/)
+- [Insomnia](https://insomnia.rest/)
+- [HTTPie](https://httpie.io/)
+- [cURL](https://curl.se/)
+
+### Client Generators
+
+- [Python](https://openapi-generator.tech/docs/generators/python/)
+- [TypeScript/Axios](https://openapi-generator.tech/docs/generators/typescript-axios/)
+- [Go](https://openapi-generator.tech/docs/generators/go/)
+- [All Generators](https://openapi-generator.tech/docs/generators/)
+
+## 🤝 Contributing
+
+Found an issue in the docs? Have a suggestion?
+
+1. Check existing [issues](https://github.com/little-secrets/amnezia-wg-easy/issues)
+2. Open a new issue with the `documentation` label
+3. Or submit a PR with improvements
+
+## 📝 Documentation Style
+
+Our docs follow these principles:
+
+- ✅ **Clear examples** for every feature
+- ✅ **Copy-paste ready** code snippets
+- ✅ **Multiple formats** (Interactive, Markdown, YAML)
+- ✅ **Practical use cases** over theory
+- ✅ **Up-to-date** with the codebase
+
+## 🆘 Need Help?
+
+- **Quick questions**: Check the [Main README](../README.md)
+- **API questions**: Use [Swagger UI](http://localhost:51821/api/docs)
+- **Bug reports**: Open an [issue](https://github.com/little-secrets/amnezia-wg-easy/issues)
+- **Discussions**: Start a [discussion](https://github.com/little-secrets/amnezia-wg-easy/discussions)
 
 ---
 
-**Need help?** Start with the [Main README](../README.md) or jump to the guide you need above!
+**Documentation generated for AmneziaWG Easy v1.0.0**
 
+🔗 [GitHub Repository](https://github.com/little-secrets/amnezia-wg-easy) | 📖 [API Docs](http://localhost:51821/api/docs) | ⭐ Star us on GitHub!

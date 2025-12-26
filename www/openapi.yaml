@@ -1,0 +1,1121 @@
+openapi: 3.0.3
+info:
+  title: AmneziaWG Easy API
+  description: |
+    REST API for managing AmneziaWG (WireGuard with obfuscation) VPN server.
+    
+    ## Authentication
+    
+    The API supports two authentication methods:
+    
+    1. **Session-based (Web UI)**: Login via `/api/session` endpoint
+    2. **Header-based (API Clients)**: Pass password in `Authorization` header
+    
+    ## Features
+    
+    - WireGuard client management
+    - AmneziaWG obfuscation parameters support
+    - QR code generation
+    - One-time download links
+    - Configuration backup/restore
+    - Prometheus metrics
+  version: 1.0.0
+  contact:
+    name: GitHub Repository
+    url: https://github.com/little-secrets/amnezia-wg-easy
+  license:
+    name: MIT
+    url: https://github.com/little-secrets/amnezia-wg-easy/blob/main/LICENSE
+
+servers:
+  - url: http://localhost:51821
+    description: Local development server
+  - url: http://your-server:51821
+    description: Production server
+
+tags:
+  - name: System
+    description: System information and settings
+  - name: Authentication
+    description: Session management and authentication
+  - name: Clients
+    description: WireGuard client management
+  - name: Configuration
+    description: Configuration download and QR codes
+  - name: One-Time Links
+    description: Temporary download links
+  - name: Backup
+    description: Configuration backup and restore
+  - name: Metrics
+    description: Prometheus metrics
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: wg-session
+      description: Session cookie obtained after login
+    
+    headerAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Password in Authorization header
+
+  schemas:
+    Client:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique client identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        name:
+          type: string
+          description: Client name
+          example: "client1"
+        enabled:
+          type: boolean
+          description: Whether client is enabled
+          example: true
+        address:
+          type: string
+          description: Client IP address
+          example: "10.8.0.2"
+        publicKey:
+          type: string
+          description: Client's public key
+          example: "ABC123..."
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        expiredAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Expiration timestamp
+        allowedIPs:
+          type: string
+          description: Allowed IPs for this client
+          example: "0.0.0.0/0, ::/0"
+        oneTimeLink:
+          type: string
+          nullable: true
+          description: One-time download link token
+        oneTimeLinkExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: One-time link expiration
+        downloadableConfig:
+          type: boolean
+          description: Whether config can be downloaded
+        persistentKeepalive:
+          type: string
+          nullable: true
+          description: Persistent keepalive setting
+        latestHandshakeAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last handshake timestamp
+        transferRx:
+          type: integer
+          format: int64
+          nullable: true
+          description: Bytes received
+        transferTx:
+          type: integer
+          format: int64
+          nullable: true
+          description: Bytes transmitted
+        endpoint:
+          type: string
+          nullable: true
+          description: Client endpoint address
+
+    CreateClientRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Client name
+          example: "client1"
+        expiredDate:
+          type: string
+          format: date
+          description: Expiration date (YYYY-MM-DD)
+          example: "2025-12-31"
+        jc:
+          type: string
+          description: Junk packet count (AmneziaWG)
+          example: "7"
+        jmin:
+          type: string
+          description: Junk packet minimum size (AmneziaWG)
+          example: "50"
+        jmax:
+          type: string
+          description: Junk packet maximum size (AmneziaWG)
+          example: "1000"
+        s1:
+          type: string
+          description: Init packet junk size (AmneziaWG)
+          example: "100"
+        s2:
+          type: string
+          description: Response packet junk size (AmneziaWG)
+          example: "100"
+        h1:
+          type: string
+          description: Init packet magic header (AmneziaWG)
+          example: "1234567891"
+        h2:
+          type: string
+          description: Response packet magic header (AmneziaWG)
+          example: "1234567892"
+        h3:
+          type: string
+          description: Underload packet magic header (AmneziaWG)
+          example: "1234567893"
+        h4:
+          type: string
+          description: Transport packet magic header (AmneziaWG)
+          example: "1234567894"
+
+    UpdateClientNameRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: New client name
+          example: "new-client-name"
+
+    UpdateClientAddressRequest:
+      type: object
+      required:
+        - address
+      properties:
+        address:
+          type: string
+          description: New IP address
+          example: "10.8.0.100"
+
+    UpdateClientExpireDateRequest:
+      type: object
+      properties:
+        expireDate:
+          type: string
+          format: date
+          description: New expiration date (YYYY-MM-DD) or empty to remove
+          example: "2025-12-31"
+
+    LoginRequest:
+      type: object
+      required:
+        - password
+      properties:
+        password:
+          type: string
+          format: password
+          description: Password for authentication
+        remember:
+          type: boolean
+          description: Whether to remember the session
+          default: false
+
+    SessionResponse:
+      type: object
+      properties:
+        requiresPassword:
+          type: boolean
+          description: Whether password authentication is required
+        authenticated:
+          type: boolean
+          description: Whether user is currently authenticated
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid client ID"
+
+    AvatarSettings:
+      type: object
+      properties:
+        dicebear:
+          type: string
+          description: Dicebear avatar style
+          example: "bottts"
+        gravatar:
+          type: boolean
+          description: Whether Gravatar is enabled
+
+    RestoreRequest:
+      type: object
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          description: JSON string of backup configuration
+
+    MetricsJSON:
+      type: object
+      properties:
+        wireguard_configured_peers:
+          type: integer
+          description: Total number of configured peers
+        wireguard_enabled_peers:
+          type: integer
+          description: Number of enabled peers
+        wireguard_connected_peers:
+          type: integer
+          description: Number of currently connected peers
+
+paths:
+  /api/release:
+    get:
+      tags:
+        - System
+      summary: Get application version
+      description: Returns the current version of the application
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "1.0.0"
+
+  /api/lang:
+    get:
+      tags:
+        - System
+      summary: Get configured language
+      description: Returns the configured UI language
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "en"
+
+  /api/remember-me:
+    get:
+      tags:
+        - System
+      summary: Check if Remember Me is enabled
+      description: Returns whether the "Remember Me" feature is enabled
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  /api/ui-traffic-stats:
+    get:
+      tags:
+        - System
+      summary: Get traffic stats setting
+      description: Returns whether traffic statistics are enabled in UI
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  /api/ui-chart-type:
+    get:
+      tags:
+        - System
+      summary: Get chart type setting
+      description: Returns the configured chart type for UI
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "1"
+
+  /api/wg-enable-one-time-links:
+    get:
+      tags:
+        - System
+      summary: Check if one-time links are enabled
+      description: Returns whether one-time download links feature is enabled
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  /api/wg-enable-expire-time:
+    get:
+      tags:
+        - System
+      summary: Check if client expiration is enabled
+      description: Returns whether client expiration feature is enabled
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  /api/ui-sort-clients:
+    get:
+      tags:
+        - System
+      summary: Check if client sorting is enabled
+      description: Returns whether client sorting is enabled in UI
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  /api/ui-avatar-settings:
+    get:
+      tags:
+        - System
+      summary: Get avatar settings
+      description: Returns the avatar configuration for UI
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvatarSettings'
+
+  /api/session:
+    get:
+      tags:
+        - Authentication
+      summary: Get session status
+      description: Returns current authentication status
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+
+    post:
+      tags:
+        - Authentication
+      summary: Login (Create session)
+      description: Authenticate and create a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Incorrect password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Authentication
+      summary: Logout (Delete session)
+      description: End current session
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client:
+    get:
+      tags:
+        - Clients
+      summary: List all clients
+      description: Returns all WireGuard clients with their statistics
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Client'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Clients
+      summary: Create a new client
+      description: |
+        Creates a new WireGuard client. AmneziaWG obfuscation parameters are optional.
+        If not specified, server defaults will be used.
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateClientRequest'
+      responses:
+        '200':
+          description: Client created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}:
+    delete:
+      tags:
+        - Clients
+      summary: Delete a client
+      description: Removes a WireGuard client permanently
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      responses:
+        '200':
+          description: Client deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/enable:
+    post:
+      tags:
+        - Clients
+      summary: Enable a client
+      description: Enables a disabled client
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      responses:
+        '200':
+          description: Client enabled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/disable:
+    post:
+      tags:
+        - Clients
+      summary: Disable a client
+      description: Disables an active client
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      responses:
+        '200':
+          description: Client disabled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/name:
+    put:
+      tags:
+        - Clients
+      summary: Update client name
+      description: Changes the name of a client
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientNameRequest'
+      responses:
+        '200':
+          description: Name updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/address:
+    put:
+      tags:
+        - Clients
+      summary: Update client IP address
+      description: Changes the IP address of a client
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientAddressRequest'
+      responses:
+        '200':
+          description: Address updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid request or IP address
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/expireDate:
+    put:
+      tags:
+        - Clients
+      summary: Update client expiration date
+      description: Sets or removes the expiration date for a client
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientExpireDateRequest'
+      responses:
+        '200':
+          description: Expiration date updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid date format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/qrcode.svg:
+    get:
+      tags:
+        - Configuration
+      summary: Get client configuration QR code
+      description: Returns an SVG QR code containing the client's WireGuard configuration
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      responses:
+        '200':
+          description: QR code SVG
+          content:
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/configuration:
+    get:
+      tags:
+        - Configuration
+      summary: Download client configuration
+      description: Downloads the WireGuard configuration file for the client
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      responses:
+        '200':
+          description: Configuration file
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="client1.conf"'
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  [Interface]
+                  PrivateKey = ABC123...
+                  Address = 10.8.0.2/24
+                  DNS = 1.1.1.1
+                  
+                  [Peer]
+                  PublicKey = SERVER_PUBLIC_KEY
+                  Endpoint = vpn.example.com:51820
+                  AllowedIPs = 0.0.0.0/0, ::/0
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/generateOneTimeLink:
+    post:
+      tags:
+        - One-Time Links
+      summary: Generate one-time download link
+      description: |
+        Generates a temporary download link for the client configuration.
+        Link expires in 5 minutes or after first use.
+        Requires WG_ENABLE_ONE_TIME_LINKS=true
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      responses:
+        '200':
+          description: Link generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Feature disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /cnf/{oneTimeLink}:
+    get:
+      tags:
+        - One-Time Links
+      summary: Download config via one-time link
+      description: |
+        Public endpoint to download configuration using a one-time link.
+        Link expires after use or after 5 minutes.
+        No authentication required.
+      parameters:
+        - name: oneTimeLink
+          in: path
+          required: true
+          schema:
+            type: string
+          description: One-time link token
+          example: "a1b2c3d4"
+      responses:
+        '200':
+          description: Configuration file
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="a1b2c3d4.conf"'
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: Invalid or expired link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/backup:
+    get:
+      tags:
+        - Backup
+      summary: Download configuration backup
+      description: Downloads a complete backup of all WireGuard configuration
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      responses:
+        '200':
+          description: Backup file
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="wg0.json"'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  server:
+                    type: object
+                    description: Server configuration
+                  clients:
+                    type: object
+                    description: Map of client configurations
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/restore:
+    put:
+      tags:
+        - Backup
+      summary: Restore configuration from backup
+      description: Restores WireGuard configuration from a backup file
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreRequest'
+      responses:
+        '200':
+          description: Configuration restored successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Restore failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /metrics:
+    get:
+      tags:
+        - Metrics
+      summary: Get Prometheus metrics
+      description: |
+        Returns metrics in Prometheus format.
+        Requires ENABLE_PROMETHEUS_METRICS=true.
+        Optional Basic Auth with PROMETHEUS_METRICS_PASSWORD.
+      security:
+        - {}
+        - headerAuth: []
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # HELP wireguard_configured_peers
+                  # TYPE wireguard_configured_peers gauge
+                  wireguard_configured_peers{interface="wg0"} 3
+
+  /metrics/json:
+    get:
+      tags:
+        - Metrics
+      summary: Get metrics in JSON format
+      description: |
+        Returns basic metrics in JSON format.
+        Requires ENABLE_PROMETHEUS_METRICS=true.
+        Optional Basic Auth with PROMETHEUS_METRICS_PASSWORD.
+      security:
+        - {}
+        - headerAuth: []
+      responses:
+        '200':
+          description: Metrics in JSON
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsJSON'
+

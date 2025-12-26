@@ -6,12 +6,12 @@
 # Build main application
 build:
 	@echo "Building amnezia-wg-easy..."
-	@go build -ldflags="-s -w" -o amnezia-wg-easy .
+	@go build -buildvcs=false -ldflags="-s -w" -o amnezia-wg-easy .
 
 # Build wgpw utility
 build-wgpw:
 	@echo "Building wgpw..."
-	@go build -ldflags="-s -w" -o wgpw ./cmd/wgpw
+	@go build -buildvcs=false -ldflags="-s -w" -o wgpw ./cmd/wgpw
 
 # Build all
 build-all: build build-wgpw
@@ -30,16 +30,16 @@ clean:
 # Docker build
 docker-build:
 	@echo "Building Docker image..."
-	@docker build -t amnezia-wg-easy:latest .
+	@docker build --no-cache -t go-amnezia-wg-easy:latest .
 
 # Docker run (development)
 docker-run:
 	@echo "Starting container..."
-	@docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+	@docker compose -f docker-compose.yml up --build
 
 # Generate password hash
 gen-password:
-	@go run ./cmd/wgpw
+	@go run -buildvcs=false ./cmd/wgpw
 
 # Download dependencies
 deps:

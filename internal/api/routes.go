@@ -84,6 +84,12 @@ func SetupRouter(cfg *config.Config, wg *wireguard.WireGuard) *gin.Engine {
 		metrics.GET("/json", h.GetMetricsJSON)
 	}
 
+	// API Documentation routes
+	r.StaticFile("/api/openapi.yaml", "./www/openapi.yaml")
+	r.GET("/api/docs", func(c *gin.Context) {
+		c.File("./www/swagger.html")
+	})
+
 	// Static files (Web UI)
 	if !cfg.NoWebUI {
 		r.Static("/css", "./www/css")
@@ -119,4 +125,3 @@ func generateSecret() string {
 	}
 	return hex.EncodeToString(bytes)
 }
-

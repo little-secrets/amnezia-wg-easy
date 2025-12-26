@@ -2,6 +2,16 @@
 
 Complete REST API documentation for AmneziaWG Easy.
 
+## 📚 Documentation Formats
+
+This API is documented in multiple formats:
+
+- **Interactive (Swagger UI)**: [`http://localhost:51821/api/docs`](http://localhost:51821/api/docs) - Try API calls directly in your browser
+- **OpenAPI Spec (YAML)**: [`openapi.yaml`](./openapi.yaml) - Machine-readable specification
+- **Markdown (this file)**: Detailed examples and explanations
+
+See [OpenAPI Guide](./OPENAPI_GUIDE.md) for more information on using the interactive documentation.
+
 ## 🌐 Base URL
 
 ```

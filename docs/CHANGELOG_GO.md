@@ -37,6 +37,21 @@ docker run --rm ghcr.io/w0rng/amnezia-wg-easy wgpw mypassword
 - Improved security by default
 - No manual configuration needed
 
+#### OpenAPI Documentation
+- Interactive Swagger UI at `/api/docs`
+- Complete OpenAPI 3.0 specification
+- Try API calls directly in browser
+- Export to Postman/Insomnia
+- Generate client SDKs
+
+```bash
+# Access Swagger UI
+http://localhost:51821/api/docs
+
+# Download OpenAPI spec
+http://localhost:51821/api/openapi.yaml
+```
+
 ### Improved Performance
 
 - **Concurrent request handling**: Better goroutine management
