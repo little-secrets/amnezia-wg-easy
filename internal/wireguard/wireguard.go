@@ -138,26 +138,58 @@ func (wg *WireGuard) CreateClient(params *models.CreateClientParams) (*models.Cl
 		return nil, fmt.Errorf("name is required")
 	}
 
-	// Generate keys
-	privateKey, err := wg.execOutput("wg genkey")
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate private key: %w", err)
+	// Generate or use provided private key
+	var privateKey, publicKey, preSharedKey string
+
+	if params.PrivateKey != nil && *params.PrivateKey != "" {
+		privateKey = *params.PrivateKey
+		// Generate public key from provided private key
+		pubKey, err := wg.execPipe(privateKey, "wg pubkey")
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate public key from private key: %w", err)
+		}
+		publicKey = strings.TrimSpace(pubKey)
+	} else {
+		// Generate new keys
+		privKey, err := wg.execOutput("wg genkey")
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate private key: %w", err)
+		}
+		privateKey = strings.TrimSpace(privKey)
+
+		pubKey, err := wg.execPipe(privateKey, "wg pubkey")
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate public key: %w", err)
+		}
+		publicKey = strings.TrimSpace(pubKey)
 	}
 
-	publicKey, err := wg.execPipe(privateKey, "wg pubkey")
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate public key: %w", err)
+	// Generate or use provided preshared key
+	if params.PreSharedKey != nil && *params.PreSharedKey != "" {
+		preSharedKey = *params.PreSharedKey
+	} else {
+		psk, err := wg.execOutput("wg genpsk")
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate preshared key: %w", err)
+		}
+		preSharedKey = strings.TrimSpace(psk)
 	}
 
-	preSharedKey, err := wg.execOutput("wg genpsk")
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate preshared key: %w", err)
-	}
-
-	// Find next available IP address
-	address, err := wg.getNextAvailableIP()
-	if err != nil {
-		return nil, err
+	// Get or generate IP address
+	var address string
+	if params.Address != nil && *params.Address != "" {
+		// Validate provided address
+		if !isValidIPv4(*params.Address) {
+			return nil, fmt.Errorf("invalid IPv4 address: %s", *params.Address)
+		}
+		address = *params.Address
+	} else {
+		// Find next available IP address
+		addr, err := wg.getNextAvailableIP()
+		if err != nil {
+			return nil, err
+		}
+		address = addr
 	}
 
 	// Create client
@@ -166,12 +198,21 @@ func (wg *WireGuard) CreateClient(params *models.CreateClientParams) (*models.Cl
 		ID:           uuid.New().String(),
 		Name:         params.Name,
 		Address:      address,
-		PrivateKey:   strings.TrimSpace(privateKey),
-		PublicKey:    strings.TrimSpace(publicKey),
-		PreSharedKey: strings.TrimSpace(preSharedKey),
+		PrivateKey:   privateKey,
+		PublicKey:    publicKey,
+		PreSharedKey: preSharedKey,
 		Enabled:      true,
 		CreatedAt:    now,
 		UpdatedAt:    now,
+
+		// Set custom network parameters if provided
+		Address6:   getStringValue(params.Address6),
+		AllowedIPs: getStringValue(params.AllowedIPs),
+
+		// Set custom WireGuard parameters if provided (nil = use server defaults)
+		DNS:                 params.DNS,
+		MTU:                 params.MTU,
+		PersistentKeepalive: params.PersistentKeepalive,
 
 		// Set custom AmneziaWG parameters if provided (nil = use server defaults)
 		Jc:   params.Jc,
@@ -303,6 +344,98 @@ func (wg *WireGuard) UpdateClientExpireDate(clientID string, expireDate *time.Ti
 	return wg.saveAndSync()
 }
 
+// UpdateClientAllowedIPs updates client allowed IPs
+func (wg *WireGuard) UpdateClientAllowedIPs(clientID, allowedIPs string) error {
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+
+	client, ok := wg.config.Clients[clientID]
+	if !ok {
+		return fmt.Errorf("client not found: %s", clientID)
+	}
+
+	client.AllowedIPs = allowedIPs
+	client.UpdatedAt = time.Now()
+
+	return wg.saveAndSync()
+}
+
+// UpdateClientDNS updates client DNS servers
+func (wg *WireGuard) UpdateClientDNS(clientID, dns string) error {
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+
+	client, ok := wg.config.Clients[clientID]
+	if !ok {
+		return fmt.Errorf("client not found: %s", clientID)
+	}
+
+	if dns == "" {
+		client.DNS = nil
+	} else {
+		client.DNS = &dns
+	}
+	client.UpdatedAt = time.Now()
+
+	return wg.saveAndSync()
+}
+
+// UpdateClientMTU updates client MTU
+func (wg *WireGuard) UpdateClientMTU(clientID, mtu string) error {
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+
+	client, ok := wg.config.Clients[clientID]
+	if !ok {
+		return fmt.Errorf("client not found: %s", clientID)
+	}
+
+	if mtu == "" {
+		client.MTU = nil
+	} else {
+		client.MTU = &mtu
+	}
+	client.UpdatedAt = time.Now()
+
+	return wg.saveAndSync()
+}
+
+// UpdateClientKeepalive updates client persistent keepalive
+func (wg *WireGuard) UpdateClientKeepalive(clientID, keepalive string) error {
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+
+	client, ok := wg.config.Clients[clientID]
+	if !ok {
+		return fmt.Errorf("client not found: %s", clientID)
+	}
+
+	if keepalive == "" {
+		client.PersistentKeepalive = nil
+	} else {
+		client.PersistentKeepalive = &keepalive
+	}
+	client.UpdatedAt = time.Now()
+
+	return wg.saveAndSync()
+}
+
+// UpdateClientAddress6 updates client IPv6 address
+func (wg *WireGuard) UpdateClientAddress6(clientID, address6 string) error {
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+
+	client, ok := wg.config.Clients[clientID]
+	if !ok {
+		return fmt.Errorf("client not found: %s", clientID)
+	}
+
+	client.Address6 = address6
+	client.UpdatedAt = time.Now()
+
+	return wg.saveAndSync()
+}
+
 // GenerateOneTimeLink generates a one-time download link for client
 func (wg *WireGuard) GenerateOneTimeLink(clientID string) error {
 	wg.mu.Lock()
@@ -381,16 +514,41 @@ func (wg *WireGuard) GetClientConfiguration(clientID string) (string, error) {
 	h3 := wg.getParamOrDefault(client.H3, wg.config.Server.H3)
 	h4 := wg.getParamOrDefault(client.H4, wg.config.Server.H4)
 
+	// Build client address (IPv4 and optional IPv6)
+	var addressStr string
+	if client.Address6 != "" {
+		addressStr = fmt.Sprintf("%s/24, %s/64", client.Address, client.Address6)
+	} else {
+		addressStr = fmt.Sprintf("%s/24", client.Address)
+	}
+
+	// Get DNS (client-specific or server default)
+	dns := wg.getParamOrDefault(client.DNS, wg.cfg.WGDefaultDNS)
+
+	// Get MTU (client-specific or server default)
+	mtu := wg.getParamOrDefault(client.MTU, wg.cfg.WGMTU)
+
+	// Get PersistentKeepalive (client-specific or server default)
+	keepalive := wg.getParamOrDefault(client.PersistentKeepalive, wg.cfg.WGPersistentKeepalive)
+
+	// Get AllowedIPs (client-specific or server default)
+	allowedIPs := wg.cfg.WGAllowedIPs
+	if client.AllowedIPs != "" {
+		allowedIPs = client.AllowedIPs
+	}
+
 	var sb strings.Builder
 	sb.WriteString("[Interface]\n")
 	sb.WriteString(fmt.Sprintf("PrivateKey = %s\n", privateKey))
-	sb.WriteString(fmt.Sprintf("Address = %s/24\n", client.Address))
-	if wg.cfg.WGDefaultDNS != "" {
-		sb.WriteString(fmt.Sprintf("DNS = %s\n", wg.cfg.WGDefaultDNS))
+	sb.WriteString(fmt.Sprintf("Address = %s\n", addressStr))
+
+	if dns != "" {
+		sb.WriteString(fmt.Sprintf("DNS = %s\n", dns))
 	}
-	if wg.cfg.WGMTU != "" {
-		sb.WriteString(fmt.Sprintf("MTU = %s\n", wg.cfg.WGMTU))
+	if mtu != "" {
+		sb.WriteString(fmt.Sprintf("MTU = %s\n", mtu))
 	}
+
 	sb.WriteString(fmt.Sprintf("Jc = %s\n", jc))
 	sb.WriteString(fmt.Sprintf("Jmin = %s\n", jmin))
 	sb.WriteString(fmt.Sprintf("Jmax = %s\n", jmax))
@@ -402,11 +560,13 @@ func (wg *WireGuard) GetClientConfiguration(clientID string) (string, error) {
 	sb.WriteString(fmt.Sprintf("H4 = %s\n", h4))
 	sb.WriteString("\n[Peer]\n")
 	sb.WriteString(fmt.Sprintf("PublicKey = %s\n", wg.config.Server.PublicKey))
+
 	if client.PreSharedKey != "" {
 		sb.WriteString(fmt.Sprintf("PresharedKey = %s\n", client.PreSharedKey))
 	}
-	sb.WriteString(fmt.Sprintf("AllowedIPs = %s\n", wg.cfg.WGAllowedIPs))
-	sb.WriteString(fmt.Sprintf("PersistentKeepalive = %s\n", wg.cfg.WGPersistentKeepalive))
+
+	sb.WriteString(fmt.Sprintf("AllowedIPs = %s\n", allowedIPs))
+	sb.WriteString(fmt.Sprintf("PersistentKeepalive = %s\n", keepalive))
 	sb.WriteString(fmt.Sprintf("Endpoint = %s:%s", wg.cfg.WGHost, wg.cfg.WGConfigPort))
 
 	return sb.String(), nil
@@ -787,6 +947,14 @@ func isValidIPv4(ip string) bool {
 		}
 	}
 	return true
+}
+
+// getStringValue returns the value of a string pointer or empty string if nil
+func getStringValue(s *string) string {
+	if s != nil {
+		return *s
+	}
+	return ""
 }
 
 // exec runs a command without capturing output

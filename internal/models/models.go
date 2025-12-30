@@ -29,6 +29,7 @@ type Client struct {
 	ID                   string     `json:"id"`
 	Name                 string     `json:"name"`
 	Address              string     `json:"address"`
+	Address6             string     `json:"address6,omitempty"`
 	PublicKey            string     `json:"publicKey"`
 	PrivateKey           string     `json:"privateKey"`
 	PreSharedKey         string     `json:"preSharedKey"`
@@ -39,6 +40,11 @@ type Client struct {
 	AllowedIPs           string     `json:"allowedIPs,omitempty"`
 	OneTimeLink          *string    `json:"oneTimeLink,omitempty"`
 	OneTimeLinkExpiresAt *time.Time `json:"oneTimeLinkExpiresAt,omitempty"`
+
+	// WireGuard custom parameters (optional, uses server defaults if not set)
+	DNS                 *string `json:"dns,omitempty"`
+	MTU                 *string `json:"mtu,omitempty"`
+	PersistentKeepalive *string `json:"persistentKeepalive,omitempty"`
 
 	// AmneziaWG obfuscation parameters (optional, uses server defaults if not set)
 	Jc   *string `json:"jc,omitempty"`
@@ -58,11 +64,14 @@ type ClientResponse struct {
 	Name                 string     `json:"name"`
 	Enabled              bool       `json:"enabled"`
 	Address              string     `json:"address"`
+	Address6             string     `json:"address6,omitempty"`
 	PublicKey            string     `json:"publicKey"`
 	CreatedAt            time.Time  `json:"createdAt"`
 	UpdatedAt            time.Time  `json:"updatedAt"`
 	ExpiredAt            *time.Time `json:"expiredAt,omitempty"`
 	AllowedIPs           string     `json:"allowedIPs,omitempty"`
+	DNS                  *string    `json:"dns,omitempty"`
+	MTU                  *string    `json:"mtu,omitempty"`
 	OneTimeLink          *string    `json:"oneTimeLink,omitempty"`
 	OneTimeLinkExpiresAt *time.Time `json:"oneTimeLinkExpiresAt,omitempty"`
 	DownloadableConfig   bool       `json:"downloadableConfig"`
@@ -80,11 +89,14 @@ func (c *Client) ToResponse() *ClientResponse {
 		Name:                 c.Name,
 		Enabled:              c.Enabled,
 		Address:              c.Address,
+		Address6:             c.Address6,
 		PublicKey:            c.PublicKey,
 		CreatedAt:            c.CreatedAt,
 		UpdatedAt:            c.UpdatedAt,
 		ExpiredAt:            c.ExpiredAt,
 		AllowedIPs:           c.AllowedIPs,
+		DNS:                  c.DNS,
+		MTU:                  c.MTU,
 		OneTimeLink:          c.OneTimeLink,
 		OneTimeLinkExpiresAt: c.OneTimeLinkExpiresAt,
 		DownloadableConfig:   c.PrivateKey != "",
@@ -108,6 +120,20 @@ type CreateClientRequest struct {
 	Name        string `json:"name" binding:"required"`
 	ExpiredDate string `json:"expiredDate,omitempty"`
 
+	// Network configuration (optional)
+	Address    *string `json:"address,omitempty"`    // IPv4 address (auto-generated if not provided)
+	Address6   *string `json:"address6,omitempty"`   // IPv6 address (optional)
+	AllowedIPs *string `json:"allowedIPs,omitempty"` // Override default allowed IPs
+
+	// Keys (optional, auto-generated if not provided)
+	PrivateKey   *string `json:"privateKey,omitempty"`   // Client private key
+	PreSharedKey *string `json:"preSharedKey,omitempty"` // Pre-shared key for extra security
+
+	// WireGuard parameters (optional, uses server defaults if not set)
+	DNS                 *string `json:"dns,omitempty"`                 // DNS servers
+	MTU                 *string `json:"mtu,omitempty"`                 // MTU size
+	PersistentKeepalive *string `json:"persistentKeepalive,omitempty"` // Keepalive interval
+
 	// AmneziaWG obfuscation parameters (optional)
 	Jc   *string `json:"jc,omitempty"`
 	Jmin *string `json:"jmin,omitempty"`
@@ -124,6 +150,20 @@ type CreateClientRequest struct {
 type CreateClientParams struct {
 	Name        string
 	ExpiredDate *time.Time
+
+	// Network configuration (optional)
+	Address    *string
+	Address6   *string
+	AllowedIPs *string
+
+	// Keys (optional, auto-generated if not provided)
+	PrivateKey   *string
+	PreSharedKey *string
+
+	// WireGuard parameters (optional, nil = use server defaults)
+	DNS                 *string
+	MTU                 *string
+	PersistentKeepalive *string
 
 	// AmneziaWG obfuscation parameters (optional, nil = use server defaults)
 	Jc   *string
@@ -150,6 +190,31 @@ type UpdateClientAddressRequest struct {
 // UpdateClientExpireDateRequest is the request body for updating expiry date
 type UpdateClientExpireDateRequest struct {
 	ExpireDate string `json:"expireDate,omitempty"`
+}
+
+// UpdateClientAllowedIPsRequest is the request body for updating allowed IPs
+type UpdateClientAllowedIPsRequest struct {
+	AllowedIPs string `json:"allowedIPs" binding:"required"`
+}
+
+// UpdateClientDNSRequest is the request body for updating DNS
+type UpdateClientDNSRequest struct {
+	DNS string `json:"dns"`
+}
+
+// UpdateClientMTURequest is the request body for updating MTU
+type UpdateClientMTURequest struct {
+	MTU string `json:"mtu"`
+}
+
+// UpdateClientKeepaliveRequest is the request body for updating persistent keepalive
+type UpdateClientKeepaliveRequest struct {
+	PersistentKeepalive string `json:"persistentKeepalive"`
+}
+
+// UpdateClientAddress6Request is the request body for updating IPv6 address
+type UpdateClientAddress6Request struct {
+	Address6 string `json:"address6"`
 }
 
 // LoginRequest is the login request body

@@ -13,13 +13,22 @@ info:
     
     ## Features
     
-    - WireGuard client management
-    - AmneziaWG obfuscation parameters support
-    - QR code generation
-    - One-time download links
-    - Configuration backup/restore
-    - Prometheus metrics
-  version: 1.0.0
+    - **Full client customization**: IPv4/IPv6, DNS, MTU, AllowedIPs, Keepalive
+    - **Custom keys**: Bring your own private/preshared keys
+    - **AmneziaWG obfuscation**: Per-client or server-wide
+    - **QR code generation**: For mobile apps
+    - **One-time download links**: Secure config distribution
+    - **Configuration backup/restore**: Easy migration
+    - **Prometheus metrics**: Monitoring and statistics
+    
+    ## New in v1.0
+    
+    - ✅ Custom IPv6 addresses
+    - ✅ Per-client DNS and MTU settings
+    - ✅ Flexible AllowedIPs (split-tunnel support)
+    - ✅ Custom persistent keepalive
+    - ✅ Import existing keys
+  version: 1.1.0
   contact:
     name: GitHub Repository
     url: https://github.com/little-secrets/amnezia-wg-easy
@@ -82,8 +91,12 @@ components:
           example: true
         address:
           type: string
-          description: Client IP address
+          description: Client IPv4 address
           example: "10.8.0.2"
+        address6:
+          type: string
+          description: Client IPv6 address (optional)
+          example: "fd42:42:42::100"
         publicKey:
           type: string
           description: Client's public key
@@ -105,6 +118,16 @@ components:
           type: string
           description: Allowed IPs for this client
           example: "0.0.0.0/0, ::/0"
+        dns:
+          type: string
+          nullable: true
+          description: Custom DNS servers for this client
+          example: "1.1.1.1, 1.0.0.1"
+        mtu:
+          type: string
+          nullable: true
+          description: Custom MTU size for this client
+          example: "1420"
         oneTimeLink:
           type: string
           nullable: true
@@ -120,7 +143,7 @@ components:
         persistentKeepalive:
           type: string
           nullable: true
-          description: Persistent keepalive setting
+          description: Persistent keepalive setting (runtime stat)
         latestHandshakeAt:
           type: string
           format: date-time
@@ -155,6 +178,38 @@ components:
           format: date
           description: Expiration date (YYYY-MM-DD)
           example: "2025-12-31"
+        address:
+          type: string
+          description: Custom IPv4 address (auto-generated if not provided)
+          example: "10.8.0.100"
+        address6:
+          type: string
+          description: Optional IPv6 address
+          example: "fd42:42:42::100"
+        allowedIPs:
+          type: string
+          description: Custom allowed IPs (overrides server default)
+          example: "0.0.0.0/0, ::/0"
+        privateKey:
+          type: string
+          description: Custom private key (auto-generated if not provided)
+          example: "YourPrivateKeyBase64=="
+        preSharedKey:
+          type: string
+          description: Custom pre-shared key (auto-generated if not provided)
+          example: "YourPSKBase64=="
+        dns:
+          type: string
+          description: Custom DNS servers
+          example: "1.1.1.1, 1.0.0.1"
+        mtu:
+          type: string
+          description: Custom MTU size
+          example: "1420"
+        persistentKeepalive:
+          type: string
+          description: Persistent keepalive interval in seconds
+          example: "25"
         jc:
           type: string
           description: Junk packet count (AmneziaWG)
@@ -220,6 +275,48 @@ components:
           format: date
           description: New expiration date (YYYY-MM-DD) or empty to remove
           example: "2025-12-31"
+
+    UpdateClientAddress6Request:
+      type: object
+      properties:
+        address6:
+          type: string
+          description: New IPv6 address (empty to remove)
+          example: "fd42:42:42::200"
+
+    UpdateClientAllowedIPsRequest:
+      type: object
+      required:
+        - allowedIPs
+      properties:
+        allowedIPs:
+          type: string
+          description: New allowed IPs
+          example: "10.0.0.0/8, 192.168.0.0/16"
+
+    UpdateClientDNSRequest:
+      type: object
+      properties:
+        dns:
+          type: string
+          description: New DNS servers (empty to use server default)
+          example: "8.8.8.8, 8.8.4.4"
+
+    UpdateClientMTURequest:
+      type: object
+      properties:
+        mtu:
+          type: string
+          description: New MTU size (empty to use server default)
+          example: "1380"
+
+    UpdateClientKeepaliveRequest:
+      type: object
+      properties:
+        persistentKeepalive:
+          type: string
+          description: New persistent keepalive interval in seconds (empty to use server default)
+          example: "30"
 
     LoginRequest:
       type: object
@@ -520,8 +617,15 @@ paths:
         - Clients
       summary: Create a new client
       description: |
-        Creates a new WireGuard client. AmneziaWG obfuscation parameters are optional.
-        If not specified, server defaults will be used.
+        Creates a new WireGuard client with full customization support.
+        
+        **All parameters are optional except `name`:**
+        - **Network**: Custom IPv4/IPv6 addresses, AllowedIPs, DNS, MTU
+        - **Security**: Custom private/preshared keys or auto-generated
+        - **Performance**: Custom persistent keepalive
+        - **Obfuscation**: AmneziaWG parameters (Jc, Jmin, Jmax, S1, S2, H1-H4)
+        
+        If parameters are not specified, server defaults will be used.
       security:
         - cookieAuth: []
         - headerAuth: []
@@ -531,6 +635,44 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateClientRequest'
+            examples:
+              basic:
+                summary: Basic client (all defaults)
+                value:
+                  name: "simple-client"
+              mobile:
+                summary: Mobile client behind NAT
+                value:
+                  name: "mobile-phone"
+                  mtu: "1280"
+                  persistentKeepalive: "25"
+                  dns: "1.1.1.1, 1.0.0.1"
+              split_tunnel:
+                summary: Split tunnel (office network only)
+                value:
+                  name: "office-client"
+                  allowedIPs: "10.0.0.0/8, 192.168.0.0/16"
+                  dns: "192.168.1.1"
+              dual_stack:
+                summary: Dual-stack (IPv4 + IPv6)
+                value:
+                  name: "dual-stack-client"
+                  address: "10.8.0.100"
+                  address6: "fd42:42:42::100"
+                  allowedIPs: "0.0.0.0/0, ::/0"
+              full_custom:
+                summary: Full customization
+                value:
+                  name: "custom-client"
+                  address: "10.8.0.200"
+                  address6: "fd42:42:42::200"
+                  allowedIPs: "0.0.0.0/0, ::/0"
+                  dns: "8.8.8.8, 8.8.4.4"
+                  mtu: "1420"
+                  persistentKeepalive: "25"
+                  jc: "10"
+                  s1: "150"
+                  s2: "150"
       responses:
         '200':
           description: Client created successfully
@@ -808,6 +950,275 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/address6:
+    put:
+      tags:
+        - Clients
+      summary: Update client IPv6 address
+      description: Sets or removes the IPv6 address for a client
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientAddress6Request'
+      responses:
+        '200':
+          description: IPv6 address updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/allowedIPs:
+    put:
+      tags:
+        - Clients
+      summary: Update client allowed IPs
+      description: Changes which traffic is routed through VPN for this client
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientAllowedIPsRequest'
+            examples:
+              full_tunnel:
+                summary: Full tunnel (all traffic)
+                value:
+                  allowedIPs: "0.0.0.0/0, ::/0"
+              split_tunnel:
+                summary: Split tunnel (specific networks)
+                value:
+                  allowedIPs: "10.0.0.0/8, 192.168.0.0/16"
+      responses:
+        '200':
+          description: Allowed IPs updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/dns:
+    put:
+      tags:
+        - Clients
+      summary: Update client DNS servers
+      description: Sets custom DNS servers for this client (empty to use server default)
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientDNSRequest'
+            examples:
+              cloudflare:
+                summary: Cloudflare DNS
+                value:
+                  dns: "1.1.1.1, 1.0.0.1"
+              google:
+                summary: Google DNS
+                value:
+                  dns: "8.8.8.8, 8.8.4.4"
+              reset:
+                summary: Use server default
+                value:
+                  dns: ""
+      responses:
+        '200':
+          description: DNS updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/mtu:
+    put:
+      tags:
+        - Clients
+      summary: Update client MTU
+      description: Sets custom MTU size for this client (empty to use server default)
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientMTURequest'
+            examples:
+              standard:
+                summary: Standard WireGuard MTU
+                value:
+                  mtu: "1420"
+              mobile:
+                summary: Mobile networks
+                value:
+                  mtu: "1280"
+              pppoe:
+                summary: PPPoE connections
+                value:
+                  mtu: "1412"
+      responses:
+        '200':
+          description: MTU updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/keepalive:
+    put:
+      tags:
+        - Clients
+      summary: Update client persistent keepalive
+      description: Sets persistent keepalive interval for this client (empty to use server default)
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientKeepaliveRequest'
+            examples:
+              nat_traversal:
+                summary: NAT traversal (recommended)
+                value:
+                  persistentKeepalive: "25"
+              aggressive:
+                summary: Aggressive keepalive
+                value:
+                  persistentKeepalive: "15"
+              disabled:
+                summary: Disabled
+                value:
+                  persistentKeepalive: "0"
+      responses:
+        '200':
+          description: Keepalive updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
         '401':
           description: Not authenticated
           content:

@@ -158,19 +158,35 @@ func (h *Handler) CreateClient(c *gin.Context) {
 		expiredDate = &t
 	}
 
-	// Build create params with optional AmneziaWG parameters
+	// Build create params with optional parameters
 	params := &models.CreateClientParams{
 		Name:        req.Name,
 		ExpiredDate: expiredDate,
-		Jc:          req.Jc,
-		Jmin:        req.Jmin,
-		Jmax:        req.Jmax,
-		S1:          req.S1,
-		S2:          req.S2,
-		H1:          req.H1,
-		H2:          req.H2,
-		H3:          req.H3,
-		H4:          req.H4,
+
+		// Network configuration
+		Address:    req.Address,
+		Address6:   req.Address6,
+		AllowedIPs: req.AllowedIPs,
+
+		// Keys
+		PrivateKey:   req.PrivateKey,
+		PreSharedKey: req.PreSharedKey,
+
+		// WireGuard parameters
+		DNS:                 req.DNS,
+		MTU:                 req.MTU,
+		PersistentKeepalive: req.PersistentKeepalive,
+
+		// AmneziaWG obfuscation parameters
+		Jc:   req.Jc,
+		Jmin: req.Jmin,
+		Jmax: req.Jmax,
+		S1:   req.S1,
+		S2:   req.S2,
+		H1:   req.H1,
+		H2:   req.H2,
+		H3:   req.H3,
+		H4:   req.H4,
 	}
 
 	_, err := h.wg.CreateClient(params)
@@ -299,6 +315,116 @@ func (h *Handler) UpdateClientExpireDate(c *gin.Context) {
 	}
 
 	if err := h.wg.UpdateClientExpireDate(clientID, expireDate); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse{Success: true})
+}
+
+// UpdateClientAllowedIPs updates client allowed IPs
+func (h *Handler) UpdateClientAllowedIPs(c *gin.Context) {
+	clientID := c.Param("clientId")
+	if !isValidClientID(clientID) {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{Error: "Invalid client ID"})
+		return
+	}
+
+	var req models.UpdateClientAllowedIPsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
+		return
+	}
+
+	if err := h.wg.UpdateClientAllowedIPs(clientID, req.AllowedIPs); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse{Success: true})
+}
+
+// UpdateClientDNS updates client DNS servers
+func (h *Handler) UpdateClientDNS(c *gin.Context) {
+	clientID := c.Param("clientId")
+	if !isValidClientID(clientID) {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{Error: "Invalid client ID"})
+		return
+	}
+
+	var req models.UpdateClientDNSRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
+		return
+	}
+
+	if err := h.wg.UpdateClientDNS(clientID, req.DNS); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse{Success: true})
+}
+
+// UpdateClientMTU updates client MTU
+func (h *Handler) UpdateClientMTU(c *gin.Context) {
+	clientID := c.Param("clientId")
+	if !isValidClientID(clientID) {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{Error: "Invalid client ID"})
+		return
+	}
+
+	var req models.UpdateClientMTURequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
+		return
+	}
+
+	if err := h.wg.UpdateClientMTU(clientID, req.MTU); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse{Success: true})
+}
+
+// UpdateClientKeepalive updates client persistent keepalive
+func (h *Handler) UpdateClientKeepalive(c *gin.Context) {
+	clientID := c.Param("clientId")
+	if !isValidClientID(clientID) {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{Error: "Invalid client ID"})
+		return
+	}
+
+	var req models.UpdateClientKeepaliveRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
+		return
+	}
+
+	if err := h.wg.UpdateClientKeepalive(clientID, req.PersistentKeepalive); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse{Success: true})
+}
+
+// UpdateClientAddress6 updates client IPv6 address
+func (h *Handler) UpdateClientAddress6(c *gin.Context) {
+	clientID := c.Param("clientId")
+	if !isValidClientID(clientID) {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{Error: "Invalid client ID"})
+		return
+	}
+
+	var req models.UpdateClientAddress6Request
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
+		return
+	}
+
+	if err := h.wg.UpdateClientAddress6(clientID, req.Address6); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
 		return
 	}

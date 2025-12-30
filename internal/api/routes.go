@@ -67,7 +67,12 @@ func SetupRouter(cfg *config.Config, wg *wireguard.WireGuard) *gin.Engine {
 		protected.POST("/wireguard/client/:clientId/generateOneTimeLink", h.GenerateOneTimeLink)
 		protected.PUT("/wireguard/client/:clientId/name", h.UpdateClientName)
 		protected.PUT("/wireguard/client/:clientId/address", h.UpdateClientAddress)
+		protected.PUT("/wireguard/client/:clientId/address6", h.UpdateClientAddress6)
 		protected.PUT("/wireguard/client/:clientId/expireDate", h.UpdateClientExpireDate)
+		protected.PUT("/wireguard/client/:clientId/allowedIPs", h.UpdateClientAllowedIPs)
+		protected.PUT("/wireguard/client/:clientId/dns", h.UpdateClientDNS)
+		protected.PUT("/wireguard/client/:clientId/mtu", h.UpdateClientMTU)
+		protected.PUT("/wireguard/client/:clientId/keepalive", h.UpdateClientKeepalive)
 		protected.GET("/wireguard/client/:clientId/qrcode.svg", h.GetClientQRCode)
 		protected.GET("/wireguard/client/:clientId/configuration", h.GetClientConfiguration)
 
