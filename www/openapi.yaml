@@ -21,13 +21,15 @@ info:
     - **Configuration backup/restore**: Easy migration
     - **Prometheus metrics**: Monitoring and statistics
     
-    ## New in v1.0
+    ## New in v1.1
     
     - ✅ Custom IPv6 addresses
     - ✅ Per-client DNS and MTU settings
     - ✅ Flexible AllowedIPs (split-tunnel support)
     - ✅ Custom persistent keepalive
-    - ✅ Import existing keys
+    - ✅ Import existing keys (privateKey or publicKey)
+    - ✅ Road warrior support (client-side key generation)
+    - ✅ Get client secrets endpoint
   version: 1.1.0
   contact:
     name: GitHub Repository
@@ -192,8 +194,24 @@ components:
           example: "0.0.0.0/0, ::/0"
         privateKey:
           type: string
-          description: Custom private key (auto-generated if not provided)
+          description: |
+            Custom private key (auto-generated if not provided).
+            
+            **Options:**
+            - Provide only `privateKey`: publicKey will be derived automatically
+            - Provide both `privateKey` and `publicKey`: keys will be validated to match
+            - Provide neither: both keys will be auto-generated
           example: "YourPrivateKeyBase64=="
+        publicKey:
+          type: string
+          description: |
+            Custom public key.
+            
+            **Options:**
+            - Provide only `publicKey`: for road warrior setup (privateKey will be empty)
+            - Provide both `privateKey` and `publicKey`: keys will be validated to match
+            - Provide neither: both keys will be auto-generated
+          example: "YourPublicKeyBase64=="
         preSharedKey:
           type: string
           description: Custom pre-shared key (auto-generated if not provided)
@@ -389,6 +407,28 @@ components:
         wireguard_connected_peers:
           type: integer
           description: Number of currently connected peers
+
+    ClientSecretsResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Client ID
+        privateKey:
+          type: string
+          description: |
+            Client's private key.
+            Empty string if client was created with only publicKey.
+          example: "cGljYV9wcml2YXRlX2tleQ=="
+        publicKey:
+          type: string
+          description: Client's public key
+          example: "cGljYV9wdWJsaWNfa2V5"
+        preSharedKey:
+          type: string
+          description: Pre-shared key for additional security
+          example: "cGljYV9wcmVzaGFyZWRfa2V5"
 
 paths:
   /api/release:
@@ -660,6 +700,26 @@ paths:
                   address: "10.8.0.100"
                   address6: "fd42:42:42::100"
                   allowedIPs: "0.0.0.0/0, ::/0"
+              import_with_publickey:
+                summary: Import client (only public key, road warrior)
+                value:
+                  name: "road-warrior-client"
+                  publicKey: "YourPublicKeyFromClientSide=="
+                  preSharedKey: "OptionalPSK=="
+              import_with_privatekey:
+                summary: Import client (only private key)
+                value:
+                  name: "imported-client"
+                  privateKey: "YourExistingPrivateKey=="
+                  preSharedKey: "YourExistingPSK=="
+                  address: "10.8.0.150"
+              import_both_keys:
+                summary: Import client (both keys, with validation)
+                value:
+                  name: "fully-imported-client"
+                  privateKey: "YourExistingPrivateKey=="
+                  publicKey: "YourMatchingPublicKey=="
+                  preSharedKey: "YourExistingPSK=="
               full_custom:
                 summary: Full customization
                 value:
@@ -1309,6 +1369,56 @@ paths:
                   PublicKey = SERVER_PUBLIC_KEY
                   Endpoint = vpn.example.com:51820
                   AllowedIPs = 0.0.0.0/0, ::/0
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Invalid client ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Client not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wireguard/client/{clientId}/secrets:
+    get:
+      tags:
+        - Configuration
+      summary: Get client secrets (keys)
+      description: |
+        Returns sensitive client data: private key, public key, and pre-shared key.
+        
+        **Security Warning:** This endpoint returns sensitive cryptographic keys.
+        Use with caution and ensure proper authentication.
+        
+        **Note:** If client was created with only publicKey (without privateKey),
+        the privateKey field will be empty.
+      security:
+        - cookieAuth: []
+        - headerAuth: []
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Client UUID
+      responses:
+        '200':
+          description: Client secrets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientSecretsResponse'
         '401':
           description: Not authenticated
           content:

@@ -126,7 +126,8 @@ type CreateClientRequest struct {
 	AllowedIPs *string `json:"allowedIPs,omitempty"` // Override default allowed IPs
 
 	// Keys (optional, auto-generated if not provided)
-	PrivateKey   *string `json:"privateKey,omitempty"`   // Client private key
+	PrivateKey   *string `json:"privateKey,omitempty"`   // Client private key (if provided, publicKey will be derived)
+	PublicKey    *string `json:"publicKey,omitempty"`    // Client public key (alternative to privateKey for import)
 	PreSharedKey *string `json:"preSharedKey,omitempty"` // Pre-shared key for extra security
 
 	// WireGuard parameters (optional, uses server defaults if not set)
@@ -158,6 +159,7 @@ type CreateClientParams struct {
 
 	// Keys (optional, auto-generated if not provided)
 	PrivateKey   *string
+	PublicKey    *string
 	PreSharedKey *string
 
 	// WireGuard parameters (optional, nil = use server defaults)
@@ -255,4 +257,12 @@ type MetricsJSON struct {
 	ConfiguredPeers int `json:"wireguard_configured_peers"`
 	EnabledPeers    int `json:"wireguard_enabled_peers"`
 	ConnectedPeers  int `json:"wireguard_connected_peers"`
+}
+
+// ClientSecretsResponse returns sensitive client data
+type ClientSecretsResponse struct {
+	ID           string `json:"id"`
+	PrivateKey   string `json:"privateKey"`
+	PublicKey    string `json:"publicKey"`
+	PreSharedKey string `json:"preSharedKey"`
 }

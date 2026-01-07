@@ -170,6 +170,7 @@ func (h *Handler) CreateClient(c *gin.Context) {
 
 		// Keys
 		PrivateKey:   req.PrivateKey,
+		PublicKey:    req.PublicKey,
 		PreSharedKey: req.PreSharedKey,
 
 		// WireGuard parameters
@@ -502,6 +503,23 @@ func (h *Handler) GetClientConfiguration(c *gin.Context) {
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.conf"`, configName))
 	c.Header("Content-Type", "text/plain")
 	c.String(http.StatusOK, config)
+}
+
+// GetClientSecrets returns client keys (privateKey, publicKey, preSharedKey)
+func (h *Handler) GetClientSecrets(c *gin.Context) {
+	clientID := c.Param("clientId")
+	if !isValidClientID(clientID) {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{Error: "Invalid client ID"})
+		return
+	}
+
+	secrets, err := h.wg.GetClientSecrets(clientID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, secrets)
 }
 
 // DownloadOneTimeLink handles one-time link downloads

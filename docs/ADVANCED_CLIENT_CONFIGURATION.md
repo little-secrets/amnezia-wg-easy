@@ -221,12 +221,24 @@ Maximum Transmission Unit - размер пакетов.
 
 ### Security Keys
 
+#### 🔑 Сценарии работы с ключами
+
+API поддерживает 4 варианта создания клиентов:
+
+| Что передать | publicKey | privateKey | Результат |
+|--------------|-----------|------------|-----------|
+| **Ничего** | Нет | Нет | ✅ Оба ключа автогенерируются |
+| **Только privateKey** | Нет | ✅ Ваш | ✅ publicKey вычисляется автоматически |
+| **Только publicKey** | ✅ Ваш | Нет | ✅ Road warrior (privateKey пустой) |
+| **Оба ключа** | ✅ Ваш | ✅ Ваш | ✅ С валидацией соответствия |
+
 #### `privateKey` (string, optional)
 Приватный ключ клиента.
 
 **По умолчанию:** Автогенерируется  
-**Использование:** Импорт существующего клиента
+**Варианты использования:**
 
+**Вариант 1: Только privateKey (publicKey вычислится автоматически)**
 ```json
 {
   "name": "imported-client",
@@ -234,9 +246,47 @@ Maximum Transmission Unit - размер пакетов.
 }
 ```
 
-**Генерация ключа вручную:**
+**Вариант 2: Оба ключа (с валидацией соответствия)**
+```json
+{
+  "name": "fully-imported-client",
+  "privateKey": "cGljYV9wcml2YXRlX2tleQ==",
+  "publicKey": "cGljYV9wdWJsaWNfa2V5"
+}
+```
+⚠️ **API проверит, что publicKey соответствует privateKey!**
+
+**Генерация ключей вручную:**
 ```bash
-wg genkey
+# Генерация приватного ключа
+wg genkey > privatekey
+
+# Получение публичного ключа из приватного
+wg pubkey < privatekey > publickey
+```
+
+#### `publicKey` (string, optional)
+Публичный ключ клиента.
+
+**По умолчанию:** Автогенерируется (или вычисляется из privateKey)  
+**Варианты использования:**
+
+**Вариант 1: Только publicKey (road warrior setup)**
+```json
+{
+  "name": "road-warrior-client",
+  "publicKey": "cGljYV9wdWJsaWNfa2V5"
+}
+```
+📝 **Результат:** privateKey будет пустым, клиент хранит ключ у себя
+
+**Вариант 2: Оба ключа (с валидацией)**
+```json
+{
+  "name": "validated-import",
+  "privateKey": "cGljYV9wcml2YXRlX2tleQ==",
+  "publicKey": "cGljYV9wdWJsaWNfa2V5"
+}
 ```
 
 #### `preSharedKey` (string, optional)
@@ -425,13 +475,39 @@ Content-Type: application/json
 - MTU 1412 - для PPPoE (1492 - 80 overhead)
 - Keepalive для стабильности
 
-### Пример 6: Импорт существующего клиента
+### Пример 6: Генерация ключей локально
+
+```bash
+# Генерируете ключи на своей машине
+PRIVATE_KEY=$(wg genkey)
+PUBLIC_KEY=$(echo "$PRIVATE_KEY" | wg pubkey)
+PSK=$(wg genpsk)
+
+# Создаете клиента через API
+curl -X POST http://localhost:51821/api/wireguard/client \
+  -H "Content-Type: application/json" \
+  -H "Authorization: your_password" \
+  -d '{
+    "name": "secure-generated",
+    "privateKey": "'$PRIVATE_KEY'",
+    "publicKey": "'$PUBLIC_KEY'",
+    "preSharedKey": "'$PSK'"
+  }'
+```
+
+**Почему:**
+- Ключи генерируются локально (не на сервере)
+- Сервер проверяет соответствие privateKey и publicKey
+- Полный контроль над процессом генерации
+
+### Пример 7: Импорт существующего клиента
 
 ```json
 {
   "name": "imported-from-other-server",
   "address": "10.8.0.150",
   "privateKey": "YourExistingPrivateKey==",
+  "publicKey": "YourExistingPublicKey==",
   "preSharedKey": "YourExistingPSK==",
   "dns": "8.8.8.8"
 }
@@ -440,6 +516,7 @@ Content-Type: application/json
 **Почему:**
 - Перенос с другого сервера
 - Сохранение тех же ключей
+- Валидация соответствия ключей
 - Переопределение настроек
 
 ## 🔍 Просмотр конфигурации клиента
@@ -497,6 +574,33 @@ Endpoint = vpn.example.com:51820
 ```
 
 ## 🚨 Важные замечания
+
+### Валидация ключей
+
+⚠️ **При передаче обоих ключей (privateKey + publicKey):**
+
+API автоматически проверяет, что publicKey соответствует privateKey!
+
+```json
+{
+  "name": "test",
+  "privateKey": "AAAA...",
+  "publicKey": "BBBB..."  // Должен соответствовать!
+}
+```
+
+❌ **Если ключи не соответствуют:**
+```
+Error: "provided publicKey does not match privateKey"
+```
+
+✅ **Проверка соответствия:**
+```bash
+# Вычислить publicKey из privateKey
+echo "YOUR_PRIVATE_KEY" | wg pubkey
+
+# Сравнить с вашим publicKey
+```
 
 ### Конфликты IP адресов
 

@@ -129,6 +129,24 @@ func (wg *WireGuard) GetClient(clientID string) (*models.Client, error) {
 	return client, nil
 }
 
+// GetClientSecrets returns sensitive client data (keys)
+func (wg *WireGuard) GetClientSecrets(clientID string) (*models.ClientSecretsResponse, error) {
+	wg.mu.RLock()
+	defer wg.mu.RUnlock()
+
+	client, ok := wg.config.Clients[clientID]
+	if !ok {
+		return nil, fmt.Errorf("client not found: %s", clientID)
+	}
+
+	return &models.ClientSecretsResponse{
+		ID:           client.ID,
+		PrivateKey:   client.PrivateKey,
+		PublicKey:    client.PublicKey,
+		PreSharedKey: client.PreSharedKey,
+	}, nil
+}
+
 // CreateClient creates a new WireGuard client
 func (wg *WireGuard) CreateClient(params *models.CreateClientParams) (*models.Client, error) {
 	wg.mu.Lock()
@@ -138,19 +156,37 @@ func (wg *WireGuard) CreateClient(params *models.CreateClientParams) (*models.Cl
 		return nil, fmt.Errorf("name is required")
 	}
 
-	// Generate or use provided private key
+	// Generate or use provided keys
 	var privateKey, publicKey, preSharedKey string
 
-	if params.PrivateKey != nil && *params.PrivateKey != "" {
+	// Scenario 1: Both PrivateKey and PublicKey provided → validate they match
+	if params.PrivateKey != nil && *params.PrivateKey != "" && params.PublicKey != nil && *params.PublicKey != "" {
 		privateKey = *params.PrivateKey
-		// Generate public key from provided private key
+		publicKey = *params.PublicKey
+
+		// Verify that publicKey matches privateKey
+		derivedPubKey, err := wg.execPipe(privateKey, "wg pubkey")
+		if err != nil {
+			return nil, fmt.Errorf("failed to derive public key from private key: %w", err)
+		}
+
+		if strings.TrimSpace(derivedPubKey) != strings.TrimSpace(publicKey) {
+			return nil, fmt.Errorf("provided publicKey does not match privateKey")
+		}
+	} else if params.PrivateKey != nil && *params.PrivateKey != "" {
+		// Scenario 2: Only PrivateKey provided → derive PublicKey from it
+		privateKey = *params.PrivateKey
 		pubKey, err := wg.execPipe(privateKey, "wg pubkey")
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate public key from private key: %w", err)
 		}
 		publicKey = strings.TrimSpace(pubKey)
+	} else if params.PublicKey != nil && *params.PublicKey != "" {
+		// Scenario 3: Only PublicKey provided (road warrior / import without private key)
+		publicKey = *params.PublicKey
+		privateKey = "" // No private key available (client-side generated)
 	} else {
-		// Generate new keys
+		// Scenario 4: Nothing provided → generate new keys
 		privKey, err := wg.execOutput("wg genkey")
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate private key: %w", err)

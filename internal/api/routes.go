@@ -75,6 +75,7 @@ func SetupRouter(cfg *config.Config, wg *wireguard.WireGuard) *gin.Engine {
 		protected.PUT("/wireguard/client/:clientId/keepalive", h.UpdateClientKeepalive)
 		protected.GET("/wireguard/client/:clientId/qrcode.svg", h.GetClientQRCode)
 		protected.GET("/wireguard/client/:clientId/configuration", h.GetClientConfiguration)
+		protected.GET("/wireguard/client/:clientId/secrets", h.GetClientSecrets)
 
 		// Backup/Restore routes
 		protected.GET("/wireguard/backup", h.BackupConfiguration)
