@@ -160,6 +160,7 @@ func (h *Handler) CreateClient(c *gin.Context) {
 
 	// Build create params with optional parameters
 	params := &models.CreateClientParams{
+		ID:          req.ID,
 		Name:        req.Name,
 		ExpiredDate: expiredDate,
 

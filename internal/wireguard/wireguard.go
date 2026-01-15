@@ -228,10 +228,22 @@ func (wg *WireGuard) CreateClient(params *models.CreateClientParams) (*models.Cl
 		address = addr
 	}
 
+	// Generate or use provided client ID
+	var clientID string
+	if params.ID != nil && *params.ID != "" {
+		clientID = *params.ID
+		// Check if client with this ID already exists
+		if _, exists := wg.config.Clients[clientID]; exists {
+			return nil, fmt.Errorf("client with ID %s already exists", clientID)
+		}
+	} else {
+		clientID = uuid.New().String()
+	}
+
 	// Create client
 	now := time.Now()
 	client := &models.Client{
-		ID:           uuid.New().String(),
+		ID:           clientID,
 		Name:         params.Name,
 		Address:      address,
 		PrivateKey:   privateKey,
@@ -551,11 +563,12 @@ func (wg *WireGuard) GetClientConfiguration(clientID string) (string, error) {
 	h4 := wg.getParamOrDefault(client.H4, wg.config.Server.H4)
 
 	// Build client address (IPv4 and optional IPv6)
+	// Use configurable CIDR prefix for IPv4
 	var addressStr string
 	if client.Address6 != "" {
-		addressStr = fmt.Sprintf("%s/24, %s/64", client.Address, client.Address6)
+		addressStr = fmt.Sprintf("%s/%d, %s/64", client.Address, wg.cfg.WGAddressCIDR, client.Address6)
 	} else {
-		addressStr = fmt.Sprintf("%s/24", client.Address)
+		addressStr = fmt.Sprintf("%s/%d", client.Address, wg.cfg.WGAddressCIDR)
 	}
 
 	// Get DNS (client-specific or server default)
@@ -873,7 +886,7 @@ func (wg *WireGuard) generateWGConf() string {
 	sb.WriteString("# Server\n")
 	sb.WriteString("[Interface]\n")
 	sb.WriteString(fmt.Sprintf("PrivateKey = %s\n", wg.config.Server.PrivateKey))
-	sb.WriteString(fmt.Sprintf("Address = %s/24\n", wg.config.Server.Address))
+	sb.WriteString(fmt.Sprintf("Address = %s/%d\n", wg.config.Server.Address, wg.cfg.WGAddressCIDR))
 	sb.WriteString(fmt.Sprintf("ListenPort = %s\n", wg.cfg.WGPort))
 	if wg.cfg.WGPreUp != "" {
 		sb.WriteString(fmt.Sprintf("PreUp = %s\n", wg.cfg.WGPreUp))

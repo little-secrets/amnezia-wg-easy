@@ -117,8 +117,10 @@ type WGDumpEntry struct {
 
 // CreateClientRequest is the request body for creating a client
 type CreateClientRequest struct {
-	Name        string `json:"name" binding:"required"`
-	ExpiredDate string `json:"expiredDate,omitempty"`
+	// Client ID (optional, auto-generated UUID if not provided)
+	ID          *string `json:"id,omitempty"`
+	Name        string  `json:"name" binding:"required"`
+	ExpiredDate string  `json:"expiredDate,omitempty"`
 
 	// Network configuration (optional)
 	Address    *string `json:"address,omitempty"`    // IPv4 address (auto-generated if not provided)
@@ -149,6 +151,8 @@ type CreateClientRequest struct {
 
 // CreateClientParams holds parameters for creating a new client
 type CreateClientParams struct {
+	// Client ID (optional, auto-generated UUID if not provided)
+	ID          *string
 	Name        string
 	ExpiredDate *time.Time
 
