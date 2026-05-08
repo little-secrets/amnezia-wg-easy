@@ -3,7 +3,10 @@ package api
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -20,8 +23,12 @@ func SetupRouter(cfg *config.Config, wg *wireguard.WireGuard) *gin.Engine {
 	r.Use(gin.Recovery())
 	r.Use(gin.Logger())
 
-	// Setup session middleware
-	secret := generateSecret()
+	// Setup session middleware. Audit H-2: persist the cookie-store
+	// secret so a restart doesn't invalidate every active UI session,
+	// and panic on crypto/rand failure rather than falling back to the
+	// hardcoded "default-secret-please-set-proper-one" constant that
+	// would let an attacker forge any session cookie.
+	secret := loadOrCreateSessionSecret(cfg.WGPath)
 	store := cookie.NewStore([]byte(secret))
 	store.Options(sessions.Options{
 		Path:     "/",
@@ -123,11 +130,39 @@ func SetupRouter(cfg *config.Config, wg *wireguard.WireGuard) *gin.Engine {
 	return r
 }
 
-func generateSecret() string {
+// loadOrCreateSessionSecret returns a 32-byte hex-encoded secret used
+// to authenticate the session cookie. Persisted in `<dataDir>/.session_secret`
+// (mode 0600) so a restart doesn't invalidate every UI session.
+//
+// Panics on crypto/rand failure -- a constant fallback would let any
+// attacker who knew the constant forge cookies. Panics on disk write
+// failure for the same reason: better to crash loudly than to silently
+// regenerate the secret on every restart.
+func loadOrCreateSessionSecret(dataDir string) string {
+	path := filepath.Join(dataDir, ".session_secret")
+	if data, err := os.ReadFile(path); err == nil {
+		s := string(data)
+		// Sanity check: hex-encoded 32 bytes is 64 chars.
+		if len(s) >= 64 {
+			return s
+		}
+		log.Printf("session secret at %s is too short (%d chars); regenerating", path, len(s))
+	}
+
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
-		// Fallback to a default (not ideal, but better than panicking)
-		return "default-secret-please-set-proper-one"
+		// crypto/rand reading from the OS entropy source rarely fails;
+		// continuing with a degraded value would defeat the cookie's
+		// authentication, so abort.
+		panic("crypto/rand failed: " + err.Error())
 	}
-	return hex.EncodeToString(bytes)
+	secret := hex.EncodeToString(bytes)
+
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		log.Printf("warning: cannot create session-secret dir %s: %v", dataDir, err)
+	}
+	if err := os.WriteFile(path, []byte(secret), 0o600); err != nil {
+		log.Printf("warning: cannot persist session secret to %s: %v", path, err)
+	}
+	return secret
 }

@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -148,6 +149,26 @@ func (h *Handler) CreateClient(c *gin.Context) {
 		return
 	}
 
+	// Audit H-5 / C-1 sibling: reject any caller-supplied ID that is
+	// not a valid UUID-v4. The previous code accepted arbitrary strings
+	// (e.g. one containing "\nPostUp=...") which then reached wg0.conf
+	// comment lines and were executed by wg-quick.
+	if req.ID != nil && *req.ID != "" && !isValidClientID(*req.ID) {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid client ID"})
+		return
+	}
+	if rejectInjection(c,
+		struct{ label, value string }{"name", req.Name},
+		struct{ label, value string }{"allowed_ips", derefStr(req.AllowedIPs)},
+		struct{ label, value string }{"dns", derefStr(req.DNS)},
+		struct{ label, value string }{"mtu", derefStr(req.MTU)},
+		struct{ label, value string }{"persistent_keepalive", derefStr(req.PersistentKeepalive)},
+		struct{ label, value string }{"address", derefStr(req.Address)},
+		struct{ label, value string }{"address6", derefStr(req.Address6)},
+	) {
+		return
+	}
+
 	var expiredDate *time.Time
 	if req.ExpiredDate != "" {
 		t, err := time.Parse("2006-01-02", req.ExpiredDate)
@@ -261,6 +282,9 @@ func (h *Handler) UpdateClientName(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
 		return
 	}
+	if rejectInjection(c, struct{ label, value string }{"name", req.Name}) {
+		return
+	}
 
 	if err := h.wg.UpdateClientName(clientID, req.Name); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
@@ -281,6 +305,9 @@ func (h *Handler) UpdateClientAddress(c *gin.Context) {
 	var req models.UpdateClientAddressRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
+		return
+	}
+	if rejectInjection(c, struct{ label, value string }{"address", req.Address}) {
 		return
 	}
 
@@ -337,6 +364,9 @@ func (h *Handler) UpdateClientAllowedIPs(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
 		return
 	}
+	if rejectInjection(c, struct{ label, value string }{"allowed_ips", req.AllowedIPs}) {
+		return
+	}
 
 	if err := h.wg.UpdateClientAllowedIPs(clientID, req.AllowedIPs); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
@@ -357,6 +387,9 @@ func (h *Handler) UpdateClientDNS(c *gin.Context) {
 	var req models.UpdateClientDNSRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
+		return
+	}
+	if rejectInjection(c, struct{ label, value string }{"dns", req.DNS}) {
 		return
 	}
 
@@ -381,6 +414,9 @@ func (h *Handler) UpdateClientMTU(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
 		return
 	}
+	if rejectInjection(c, struct{ label, value string }{"mtu", req.MTU}) {
+		return
+	}
 
 	if err := h.wg.UpdateClientMTU(clientID, req.MTU); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
@@ -403,6 +439,9 @@ func (h *Handler) UpdateClientKeepalive(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
 		return
 	}
+	if rejectInjection(c, struct{ label, value string }{"persistent_keepalive", req.PersistentKeepalive}) {
+		return
+	}
 
 	if err := h.wg.UpdateClientKeepalive(clientID, req.PersistentKeepalive); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
@@ -423,6 +462,9 @@ func (h *Handler) UpdateClientAddress6(c *gin.Context) {
 	var req models.UpdateClientAddress6Request
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
+		return
+	}
+	if rejectInjection(c, struct{ label, value string }{"address6", req.Address6}) {
 		return
 	}
 
@@ -552,13 +594,34 @@ func (h *Handler) DownloadOneTimeLink(c *gin.Context) {
 	c.String(http.StatusOK, config)
 }
 
-// BackupConfiguration returns configuration backup
+// BackupConfiguration returns configuration backup.
+//
+// Audit H-4: the response is the raw wg0.json -- every peer's private
+// key and PSK in cleartext, plus the server private key. A single
+// authenticated GET extracts every secret managed by the service.
+// Require an explicit `?confirm=true` query parameter so the endpoint
+// cannot be hit accidentally (e.g. by a careless tab in a browser
+// extension that prefetches links). Log every successful backup so
+// operators have an audit trail.
+//
+// The deeper fix -- encrypting the backup with a passphrase before
+// returning it, or requiring step-up auth -- is a follow-up.
 func (h *Handler) BackupConfiguration(c *gin.Context) {
+	if c.Query("confirm") != "true" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: "Backup contains every peer's private key and PSK. " +
+				"Re-issue the request with ?confirm=true to acknowledge.",
+		})
+		return
+	}
+
 	backup, err := h.wg.BackupConfiguration()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
 		return
 	}
+
+	log.Printf("[backup] configuration exported from %s", c.ClientIP())
 
 	c.Header("Content-Disposition", `attachment; filename="wg0.json"`)
 	c.Header("Content-Type", "application/json")
@@ -616,12 +679,73 @@ func (h *Handler) GetMetricsJSON(c *gin.Context) {
 
 // Helper functions
 
+// uuidV4Pattern is the strict UUID-v4 form used by every clientID we
+// generate (uuid.New()). Audit H-5: the previous validator only blocked
+// three JavaScript prototype-pollution literals -- a Go-irrelevant
+// concern that gave a false sense of security while letting through
+// arbitrary strings, including ones containing newline characters that
+// flowed into wg0.conf comment lines and turned into wg-quick PostUp
+// injection opportunities.
+var uuidV4Pattern = regexp.MustCompile(
+	`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`,
+)
+
 func isValidClientID(id string) bool {
-	// Protect against prototype pollution
-	if id == "__proto__" || id == "constructor" || id == "prototype" {
-		return false
+	return uuidV4Pattern.MatchString(id)
+}
+
+// containsConfigInjection rejects any byte that, when written into
+// wg0.conf, would let a peer field break out of its line and either
+// declare a new section ([Peer], [Interface]) or inject a wg-quick
+// hook (PostUp = curl ...). Audit C-1 sibling.
+//
+// The legitimate values for the affected fields (name, AllowedIPs,
+// DNS, MTU, keepalive) never contain newlines, NUL, or shell control
+// characters in any deployment we ship, so a strict allow-policy is
+// safe; a future addition that needs richer characters can scope a
+// dedicated validator to that field.
+func containsConfigInjection(s string) bool {
+	for _, r := range s {
+		switch r {
+		case '\n', '\r', '\x00':
+			return true
+		}
+		// Reject any other ASCII control char (< 0x20 except tab).
+		if r < 0x20 && r != '\t' {
+			return true
+		}
+		// 0x7F is DEL.
+		if r == 0x7F {
+			return true
+		}
 	}
-	return id != ""
+	return false
+}
+
+// derefStr returns the string the pointer references, or "" if nil.
+// Used to feed optional request fields into rejectInjection without
+// peppering the call sites with nil checks.
+func derefStr(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
+// rejectInjection writes a 400 response and returns true if any of the
+// supplied (label, value) pairs contains a forbidden byte. Use it at
+// the top of every handler that forwards caller-controlled strings into
+// wg0.conf-bound fields.
+func rejectInjection(c *gin.Context, pairs ...struct{ label, value string }) bool {
+	for _, p := range pairs {
+		if containsConfigInjection(p.value) {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{
+				Error: "Invalid characters in " + p.label,
+			})
+			return true
+		}
+	}
+	return false
 }
 
 func sanitizeFilename(name string) string {

@@ -1,9 +1,11 @@
 package wireguard
 
 import (
+	cryptorand "crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"hash/crc32"
 	"log"
 	"os"
 	"path/filepath"
@@ -484,7 +486,15 @@ func (wg *WireGuard) UpdateClientAddress6(clientID, address6 string) error {
 	return wg.saveAndSync()
 }
 
-// GenerateOneTimeLink generates a one-time download link for client
+// GenerateOneTimeLink generates a one-time download link for a client.
+//
+// Audit C-3: the previous implementation derived the link as the CRC32
+// of `<clientID>-<UnixNano()%1000>`, an 8-hex-char value with ~10 bits
+// of effective entropy. Iterating every value took milliseconds, so
+// /cnf/<token> -- which returns the full peer .conf including the
+// private key, with no auth -- was effectively a guessing oracle.
+//
+// Use crypto/rand for 128 bits of entropy and a URL-safe encoding.
 func (wg *WireGuard) GenerateOneTimeLink(clientID string) error {
 	wg.mu.Lock()
 	defer wg.mu.Unlock()
@@ -494,9 +504,14 @@ func (wg *WireGuard) GenerateOneTimeLink(clientID string) error {
 		return fmt.Errorf("client not found: %s", clientID)
 	}
 
-	key := fmt.Sprintf("%s-%d", clientID, time.Now().UnixNano()%1000)
-	hash := crc32.ChecksumIEEE([]byte(key))
-	link := fmt.Sprintf("%x", hash)
+	tokenBytes := make([]byte, 16)
+	if _, err := cryptorand.Read(tokenBytes); err != nil {
+		// crypto/rand reading from /dev/urandom rarely fails. If it
+		// does, returning a low-entropy fallback would defeat the
+		// fix; surface the failure instead.
+		return fmt.Errorf("generate one-time link: %w", err)
+	}
+	link := base64.RawURLEncoding.EncodeToString(tokenBytes)
 	expiresAt := time.Now().Add(5 * time.Minute)
 
 	client.OneTimeLink = &link
@@ -523,15 +538,34 @@ func (wg *WireGuard) EraseOneTimeLink(clientID string) error {
 	return wg.saveAndSync()
 }
 
-// GetClientByOneTimeLink finds a client by their one-time link
+// GetClientByOneTimeLink finds a client by their one-time link.
+//
+// Audit M-6: the cron job pruned expired tokens once a minute, so the
+// previous implementation honored an expired link in the window between
+// expiry and the next cron tick. Verify expiry inline and use a
+// constant-time string compare so the loop does not leak a near-match
+// via timing.
 func (wg *WireGuard) GetClientByOneTimeLink(link string) (*models.Client, error) {
+	if link == "" {
+		return nil, fmt.Errorf("empty one-time link")
+	}
 	wg.mu.RLock()
 	defer wg.mu.RUnlock()
 
+	now := time.Now()
+	linkBytes := []byte(link)
 	for _, client := range wg.config.Clients {
-		if client.OneTimeLink != nil && *client.OneTimeLink == link {
-			return client, nil
+		if client.OneTimeLink == nil {
+			continue
 		}
+		stored := []byte(*client.OneTimeLink)
+		if subtle.ConstantTimeCompare(stored, linkBytes) != 1 {
+			continue
+		}
+		if client.OneTimeLinkExpiresAt != nil && now.After(*client.OneTimeLinkExpiresAt) {
+			return nil, fmt.Errorf("one-time link expired")
+		}
+		return client, nil
 	}
 	return nil, fmt.Errorf("client not found for one-time link")
 }
@@ -868,7 +902,11 @@ func (wg *WireGuard) saveConfig() error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(jsonPath, jsonData, 0660); err != nil {
+	// Audit H-3: 0o660 was group-readable, so any process running under
+	// the same group inside the container (or on the host) could read
+	// every peer's private key + PSK out of wg0.json. Tighten to 0o600
+	// -- only the daemon's UID can read it.
+	if err := os.WriteFile(jsonPath, jsonData, 0o600); err != nil {
 		return err
 	}
 

@@ -11,11 +11,17 @@ import (
 	"github.com/little-secrets/amnezia-wg-easy/internal/models"
 )
 
-// AuthMiddleware checks if the user is authenticated
+// AuthMiddleware checks if the user is authenticated.
+//
+// Audit C-2: empty PASSWORD_HASH used to silently disable auth. main.go
+// now refuses to start with empty PASSWORD_HASH unless NO_AUTH=true was
+// explicitly set; in that mode the bind is forced to 127.0.0.1. The
+// fallthrough below only fires when both flags align, so an attacker
+// cannot mute auth by emptying the hash at runtime without also having
+// 127.0.0.1 access.
 func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Skip if no password required
-		if !cfg.RequiresPassword() {
+		if cfg.PasswordHash == "" && cfg.NoAuth {
 			c.Next()
 			return
 		}
