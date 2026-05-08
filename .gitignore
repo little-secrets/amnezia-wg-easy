@@ -28,8 +28,9 @@ node_modules/
 npm-debug.log
 yarn-error.log
 
-# WireGuard config (for local testing)
-config/
+# WireGuard config (for local testing) — anchored to repo root so the
+# `internal/config/` Go package is NOT excluded.
+/config/
 *.conf
 wg0.json
 
