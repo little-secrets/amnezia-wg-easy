@@ -902,7 +902,11 @@ func (wg *WireGuard) saveConfig() error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(jsonPath, jsonData, 0660); err != nil {
+	// Audit H-3: 0o660 was group-readable, so any process running under
+	// the same group inside the container (or on the host) could read
+	// every peer's private key + PSK out of wg0.json. Tighten to 0o600
+	// -- only the daemon's UID can read it.
+	if err := os.WriteFile(jsonPath, jsonData, 0o600); err != nil {
 		return err
 	}
 
