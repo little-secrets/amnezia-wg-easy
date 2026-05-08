@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -593,13 +594,34 @@ func (h *Handler) DownloadOneTimeLink(c *gin.Context) {
 	c.String(http.StatusOK, config)
 }
 
-// BackupConfiguration returns configuration backup
+// BackupConfiguration returns configuration backup.
+//
+// Audit H-4: the response is the raw wg0.json -- every peer's private
+// key and PSK in cleartext, plus the server private key. A single
+// authenticated GET extracts every secret managed by the service.
+// Require an explicit `?confirm=true` query parameter so the endpoint
+// cannot be hit accidentally (e.g. by a careless tab in a browser
+// extension that prefetches links). Log every successful backup so
+// operators have an audit trail.
+//
+// The deeper fix -- encrypting the backup with a passphrase before
+// returning it, or requiring step-up auth -- is a follow-up.
 func (h *Handler) BackupConfiguration(c *gin.Context) {
+	if c.Query("confirm") != "true" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: "Backup contains every peer's private key and PSK. " +
+				"Re-issue the request with ?confirm=true to acknowledge.",
+		})
+		return
+	}
+
 	backup, err := h.wg.BackupConfiguration()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: err.Error()})
 		return
 	}
+
+	log.Printf("[backup] configuration exported from %s", c.ClientIP())
 
 	c.Header("Content-Disposition", `attachment; filename="wg0.json"`)
 	c.Header("Content-Type", "application/json")
