@@ -27,6 +27,26 @@ The easiest way to install & manage AmneziaWG with a Web UI, rewritten in Go.
 | Memory usage | ~100MB | ~30MB |
 | Startup time | ~2s | <100ms |
 
+## 🔐 Deployment posture (read before going public)
+
+This service speaks plain HTTP and stores every peer's private key on
+disk. Run it with **TLS at the edge** and **auth always on**:
+
+- **Bind to loopback or to a wireguard-mesh address only.** Set
+  `WEBUI_HOST=127.0.0.1` (or your mesh address) and front the service
+  with nginx / Caddy / a tailnet proxy that terminates TLS. Do **not**
+  expose `:51821` directly to the public Internet.
+- **PASSWORD_HASH must be set.** The service refuses to start with an
+  empty `PASSWORD_HASH` unless you explicitly pass `NO_AUTH=true`. In
+  no-auth mode the listener is force-pinned to `127.0.0.1`; even there
+  it is intended for local development only.
+- **Backup endpoint** (`GET /api/wireguard/backup`) returns the entire
+  keyset; it now requires `?confirm=true` to discourage accidental
+  exposure. Treat the resulting `wg0.json` as a credentials vault.
+- **Per-peer config download** (`GET /cnf/<token>`) is unauthenticated
+  by design (the token is the cap). Tokens are 128-bit random hex
+  values, single-use, and expire after 5 minutes.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
